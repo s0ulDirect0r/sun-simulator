@@ -199,29 +199,55 @@ class SunSimulator {
   private startTransitionToMainSequence(): void {
     console.log('Starting transition to main sequence star...')
 
-    // Create star
-    this.star = new Star(this.scene)
+    // Get protostar's current size for smooth transition
+    const protostarRadius = this.nebula ? this.nebula.getProtostarRadius() : 4.8
+
+    // Create star at protostar's current size
+    this.star = new Star(this.scene, protostarRadius)
     this.ignitionBurst = new IgnitionBurst(this.scene)
 
     // Fade out and dispose of nebula over time
     if (this.nebula) {
+      // Store initial protostar material values
+      const protostarMaterial = this.nebula['protostar'].material as THREE.MeshStandardMaterial
+      const initialEmissiveIntensity = protostarMaterial.emissiveIntensity
+      const protostarLight = this.nebula['protostarLight'] as THREE.PointLight
+      const initialLightIntensity = protostarLight.intensity
+
+      // Make protostar material transparent for opacity fade
+      protostarMaterial.transparent = true
+
       // Start fade animation
       this.transitionProgress = 0
       const fadeInterval = setInterval(() => {
         this.transitionProgress += 0.016
 
         if (this.nebula && this.transitionProgress < this.transitionDuration) {
-          // Fade nebula opacity
-          const opacity = 1 - (this.transitionProgress / this.transitionDuration)
+          // Fade progress (0 = full opacity, 1 = invisible)
+          const fadeProgress = this.transitionProgress / this.transitionDuration
+          const opacity = 1 - fadeProgress
+
+          // Fade nebula particles
           this.nebula['material'].opacity = opacity * 0.8
           this.nebula['particles'].visible = opacity > 0.1
+
+          // Fade protostar mesh opacity
+          protostarMaterial.opacity = opacity
+
+          // Fade protostar emissive intensity
+          protostarMaterial.emissiveIntensity = initialEmissiveIntensity * opacity
+
+          // Fade protostar light intensity
+          protostarLight.intensity = initialLightIntensity * opacity
         } else {
-          // Transition complete
+          // Transition complete - now safe to remove
           if (this.nebula) {
             this.scene.remove(this.nebula['particles'])
             this.scene.remove(this.nebula['protostar'])
             this.scene.remove(this.nebula['protostarLight'])
+            console.log('removing protostar!')
             this.nebula.dispose()
+            console.log('nebula disposed')
             this.nebula = null
           }
           clearInterval(fadeInterval)
