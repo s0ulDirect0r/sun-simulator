@@ -1,4 +1,5 @@
 import * as THREE from 'three'
+import { SupernovaFlash } from './SupernovaFlash'
 
 export class Star {
   private star!: THREE.Mesh
@@ -46,6 +47,14 @@ export class Star {
   private expansionStartRadius: number = 4.0
   private irregularPulseOffset: number = 0 // Random variation in pulsing
 
+  // Supernova state
+  private isSupernova: boolean = false
+  private supernovaTime: number = 0
+  private supernovaDuration: number = 6.0 // 6 seconds for explosion
+  private shockwave!: THREE.Mesh
+  private shockwaveMaterial!: THREE.MeshBasicMaterial
+  private supernovaFlash: SupernovaFlash | null = null
+
   constructor(scene: THREE.Scene, initialRadius: number = 4.8) {
     this.initialRadius = initialRadius
     this.currentRadius = initialRadius // Start at whatever size the protostar was
@@ -62,6 +71,25 @@ export class Star {
 
     // Create surface texture particles (for mottled red giant appearance)
     this.createSurfaceTexture()
+
+    // Create shockwave (invisible initially)
+    this.createShockwave()
+  }
+
+  private createShockwave(): void {
+    // Create expanding ring geometry for shockwave
+    const geometry = new THREE.RingGeometry(1, 1.5, 64)
+    this.shockwaveMaterial = new THREE.MeshBasicMaterial({
+      color: 0xffffff,
+      transparent: true,
+      opacity: 0.0,
+      side: THREE.DoubleSide,
+      blending: THREE.AdditiveBlending
+    })
+
+    this.shockwave = new THREE.Mesh(geometry, this.shockwaveMaterial)
+    this.shockwave.rotation.x = Math.PI / 2 // Orient horizontally
+    this.scene.add(this.shockwave)
   }
 
   private createSurfaceTexture(): void {
@@ -209,8 +237,74 @@ export class Star {
   public update(deltaTime: number): void {
     this.time += deltaTime
 
-    // Smooth contraction from protostar size to main sequence size
-    if (this.contractionTime < this.contractionDuration) {
+    // Handle supernova explosion
+    if (this.isSupernova) {
+      this.supernovaTime += deltaTime
+      const supernovaProgress = Math.min(this.supernovaTime / this.supernovaDuration, 1.0)
+
+      // Update flash effect
+      if (this.supernovaFlash) {
+        this.supernovaFlash.update(deltaTime)
+        if (!this.supernovaFlash.active) {
+          this.supernovaFlash = null
+        }
+      }
+
+      // Bright flash at beginning, then fade
+      const material = this.star.material as THREE.MeshStandardMaterial
+      if (supernovaProgress < 0.1) {
+        // Initial MASSIVE flash (0-10%) - should be blinding and fill the entire scene
+        const flashProgress = supernovaProgress / 0.1
+        material.emissiveIntensity = THREE.MathUtils.lerp(2, 50, flashProgress)
+        // Crank light to insane levels - supernova briefly outshines entire galaxy
+        this.starLight.intensity = THREE.MathUtils.lerp(10, 1000, flashProgress)
+        this.starLight.distance = 500 // Increase range so it lights everything
+        material.color.set(0xffffff) // Pure white during flash
+      } else {
+        // Fade out (10-100%)
+        const fadeProgress = (supernovaProgress - 0.1) / 0.9
+        material.opacity = THREE.MathUtils.lerp(0.85, 0.0, fadeProgress)
+        material.emissiveIntensity = THREE.MathUtils.lerp(50, 0, fadeProgress)
+        this.starLight.intensity = THREE.MathUtils.lerp(1000, 0, fadeProgress)
+        this.starLight.distance = THREE.MathUtils.lerp(500, 150, fadeProgress)
+
+        // Fade out all other objects
+        this.coronaMaterial.opacity = THREE.MathUtils.lerp(0.7, 0.0, fadeProgress)
+        this.surfaceTextureMaterial.opacity = THREE.MathUtils.lerp(0.4, 0.0, fadeProgress)
+      }
+
+      // Expanding shockwave
+      const shockwaveScale = THREE.MathUtils.lerp(this.currentRadius, this.currentRadius * 20, supernovaProgress)
+      this.shockwave.scale.setScalar(shockwaveScale)
+
+      // Shockwave opacity - peak at 20%, then fade
+      if (supernovaProgress < 0.2) {
+        this.shockwaveMaterial.opacity = THREE.MathUtils.lerp(0, 0.8, supernovaProgress / 0.2)
+      } else {
+        this.shockwaveMaterial.opacity = THREE.MathUtils.lerp(0.8, 0, (supernovaProgress - 0.2) / 0.8)
+      }
+
+      // Make explosion particles bright white during flash, then blue
+      if (supernovaProgress < 0.1) {
+        this.surfaceMaterial.color.set(0xffffff) // Pure white during flash
+        this.surfaceMaterial.opacity = 1.0
+        this.surfaceMaterial.size = 0.8 // Bigger particles during flash
+      } else {
+        this.surfaceMaterial.color.set(0xaaccff) // Blue after flash
+        this.surfaceMaterial.opacity = THREE.MathUtils.lerp(1.0, 0.3, (supernovaProgress - 0.1) / 0.9)
+        this.surfaceMaterial.size = 0.4 // Back to normal
+      }
+    }
+
+    // Calculate expansion progress (needed for particle colors later)
+    const expansionProgress = this.isRedGiant
+      ? Math.min(this.expansionTime / this.expansionDuration, 1.0)
+      : 0
+
+    // Skip normal star behavior during supernova
+    if (!this.isSupernova) {
+      // Smooth contraction from protostar size to main sequence size
+      if (this.contractionTime < this.contractionDuration) {
       this.contractionTime += deltaTime
       const contractionProgress = Math.min(this.contractionTime / this.contractionDuration, 1.0)
       // Use easeOutCubic for smooth deceleration
@@ -229,11 +323,6 @@ export class Star {
     } else if (!this.isRedGiant) {
       this.currentRadius = this.starRadius
     }
-
-    // Calculate expansion progress for color shift (0 = main sequence, 1 = full red giant)
-    const expansionProgress = this.isRedGiant
-      ? Math.min(this.expansionTime / this.expansionDuration, 1.0)
-      : 0
 
     // Pulse effect - larger and slower for red giants with irregular variation
     const pulseFrequency = this.isRedGiant ? 0.3 : 0.5
@@ -333,6 +422,7 @@ export class Star {
       // Hide surface texture for main sequence
       this.surfaceTextureMaterial.opacity = 0.0
     }
+    } // End skip normal star behavior during supernova
 
     // Update surface activity particles (stellar wind)
     const positions = this.surfaceGeometry.attributes.position.array as Float32Array
@@ -357,7 +447,8 @@ export class Star {
       )
 
       // Reset particles that go too far (continuous stellar wind) - let them travel MUCH further
-      if (distance > this.currentRadius * 15) { // Scale with current star size
+      // DON'T reset during supernova - let them fly away forever
+      if (!this.isSupernova && distance > this.currentRadius * 15) { // Scale with current star size
         const theta = Math.random() * Math.PI * 2
         const phi = Math.acos(2 * Math.random() - 1)
 
@@ -378,8 +469,8 @@ export class Star {
       }
     }
 
-    // Update stellar wind particle color for red giants
-    if (this.isRedGiant) {
+    // Update stellar wind particle color for red giants (unless supernova - handled above)
+    if (this.isRedGiant && !this.isSupernova) {
       const orangeColor = new THREE.Color(0xff9922)
       const redColor = new THREE.Color(0xff4422)
       const blendedColor = new THREE.Color().lerpColors(orangeColor, redColor, expansionProgress * 0.7)
@@ -400,6 +491,41 @@ export class Star {
 
   public isInRedGiantPhase(): boolean {
     return this.isRedGiant
+  }
+
+  public startSupernova(): void {
+    if (this.isSupernova) return // Already exploding
+
+    this.isSupernova = true
+    this.supernovaTime = 0
+    console.log('SUPERNOVA!')
+
+    // Create dramatic scene-filling flash
+    this.supernovaFlash = new SupernovaFlash(this.scene)
+
+    // Enable transparency on star material so opacity changes work
+    const material = this.star.material as THREE.MeshStandardMaterial
+    material.transparent = true
+
+    // Blast all stellar wind particles outward at high speed
+    for (let i = 0; i < this.surfaceCount; i++) {
+      const i3 = i * 3
+      const x = this.surfacePositions[i3]
+      const y = this.surfacePositions[i3 + 1]
+      const z = this.surfacePositions[i3 + 2]
+
+      const distance = Math.sqrt(x * x + y * y + z * z) || 1
+      const explosionSpeed = 0.5 + Math.random() * 0.3 // Very fast
+
+      // Blast outward from center
+      this.surfaceVelocities[i3] = (x / distance) * explosionSpeed
+      this.surfaceVelocities[i3 + 1] = (y / distance) * explosionSpeed
+      this.surfaceVelocities[i3 + 2] = (z / distance) * explosionSpeed
+    }
+  }
+
+  public isInSupernovaPhase(): boolean {
+    return this.isSupernova
   }
 
   public dispose(): void {

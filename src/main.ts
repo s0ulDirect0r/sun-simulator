@@ -31,6 +31,8 @@ class SunSimulator {
   private lastDebugText = ''
   private mainSequenceTimer: number = 0
   private mainSequenceDuration: number = 30.0 // 30 seconds in main sequence before red giant
+  private redGiantTimer: number = 0
+  private redGiantDuration: number = 15.0 // 15 seconds in red giant before supernova
 
   constructor() {
     // Get canvas element
@@ -197,11 +199,19 @@ class SunSimulator {
       case SimulationPhase.RED_GIANT:
         if (this.star) {
           this.star.update(deltaTime)
+
+          // Track red giant duration and trigger supernova
+          this.redGiantTimer += deltaTime
+          if (this.redGiantTimer >= this.redGiantDuration && !this.star.isInSupernovaPhase()) {
+            this.startSupernova()
+          }
         }
         break
 
       case SimulationPhase.SUPERNOVA:
-        // TODO: Phase 4 implementation
+        if (this.star) {
+          this.star.update(deltaTime)
+        }
         break
     }
   }
@@ -220,6 +230,22 @@ class SunSimulator {
       this.debugRadiusElement.textContent = ''
     }
     this.updatePhaseInfo('Phase 3: Red Giant Expansion')
+  }
+
+  private startSupernova(): void {
+    console.log('Starting supernova explosion...')
+
+    if (this.star) {
+      this.star.startSupernova()
+    }
+
+    // Update phase
+    this.currentPhase = SimulationPhase.SUPERNOVA
+    this.lastDebugText = ''
+    if (this.debugRadiusElement) {
+      this.debugRadiusElement.textContent = ''
+    }
+    this.updatePhaseInfo('Phase 4: SUPERNOVA!')
   }
 
   private startTransitionToMainSequence(): void {
