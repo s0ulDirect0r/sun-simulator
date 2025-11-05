@@ -17,13 +17,22 @@ export class Star {
   private surfaceParticles!: THREE.Points
   private surfaceGeometry!: THREE.BufferGeometry
   private surfaceMaterial!: THREE.PointsMaterial
-  private surfaceCount: number = 500
+  private surfaceCount: number = 900 // Balanced stellar wind
   private surfacePositions!: Float32Array
   private surfaceVelocities!: Float32Array
 
-  private starRadius: number = 8
+  private starRadius: number = 4.0 // Main sequence star - compact and stable
+  private initialRadius: number // Start size (from protostar)
+  private currentRadius: number // Current size during contraction
+  private contractionDuration: number = 3.0 // 3 seconds to contract
+  private contractionTime: number = 0
 
-  constructor(scene: THREE.Scene) {
+  // No fade in needed - start at full opacity for seamless transition
+  private currentOpacity: number = 1.0
+
+  constructor(scene: THREE.Scene, initialRadius: number = 4.8) {
+    this.initialRadius = initialRadius
+    this.currentRadius = initialRadius // Start at whatever size the protostar was
     this.scene = scene
 
     // Create main star sphere
@@ -48,6 +57,7 @@ export class Star {
     })
 
     this.star = new THREE.Mesh(geometry, material)
+    this.star.scale.setScalar(this.currentRadius / this.starRadius) // Start at protostar size
     this.scene.add(this.star)
 
     // Main star light - bright and far-reaching
@@ -61,12 +71,12 @@ export class Star {
     this.coronaGeometry = new THREE.BufferGeometry()
     this.coronaPositions = new Float32Array(this.coronaCount * 3)
 
-    // Create corona particles in a spherical shell around star
+    // Create corona particles in a tight shell around star
     for (let i = 0; i < this.coronaCount; i++) {
       const i3 = i * 3
 
-      // Corona radius slightly larger than star
-      const radius = this.starRadius * (1.2 + Math.random() * 0.3)
+      // Corona very tight to star surface - use INITIAL radius so it's visible from start
+      const radius = this.initialRadius * (1.02 + Math.random() * 0.06) // Very tight: 1.02-1.08x star size
       const theta = Math.random() * Math.PI * 2
       const phi = Math.acos(2 * Math.random() - 1)
 
@@ -77,12 +87,12 @@ export class Star {
 
     this.coronaGeometry.setAttribute('position', new THREE.BufferAttribute(this.coronaPositions, 3))
 
-    // Corona material - yellowish-white glow
+    // Corona material - subtle yellowish-white glow
     this.coronaMaterial = new THREE.PointsMaterial({
-      size: 0.3,
-      color: 0xffffaa,
+      size: 0.4, // Smaller particles
+      color: 0xffffaa, // Soft yellow-white
       transparent: true,
-      opacity: 0.6,
+      opacity: 0.5, // Subtle glow
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -109,8 +119,8 @@ export class Star {
       this.surfacePositions[i3 + 1] = this.starRadius * Math.sin(phi) * Math.sin(theta)
       this.surfacePositions[i3 + 2] = this.starRadius * Math.cos(phi)
 
-      // Initial velocities pointing outward (solar flares)
-      const speed = 0.02 + Math.random() * 0.05
+      // Initial velocities pointing outward (stellar wind / solar flares)
+      const speed = 0.03 + Math.random() * 0.08 // Balanced speed
       this.surfaceVelocities[i3] = this.surfacePositions[i3] / this.starRadius * speed
       this.surfaceVelocities[i3 + 1] = this.surfacePositions[i3 + 1] / this.starRadius * speed
       this.surfaceVelocities[i3 + 2] = this.surfacePositions[i3 + 2] / this.starRadius * speed
@@ -118,12 +128,12 @@ export class Star {
 
     this.surfaceGeometry.setAttribute('position', new THREE.BufferAttribute(this.surfacePositions, 3))
 
-    // Surface activity material - bright orange-yellow
+    // Surface activity material - orange-yellow stellar wind
     this.surfaceMaterial = new THREE.PointsMaterial({
-      size: 0.4,
-      color: 0xff8800,
+      size: 0.4, // Smaller particles
+      color: 0xff9922, // Keep original orange-yellow
       transparent: true,
-      opacity: 0.8,
+      opacity: 1.0, // Full brightness
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -135,9 +145,22 @@ export class Star {
   public update(deltaTime: number): void {
     this.time += deltaTime
 
-    // Pulse effect for star (subtle breathing)
+    // Smooth contraction from protostar size to main sequence size
+    if (this.contractionTime < this.contractionDuration) {
+      this.contractionTime += deltaTime
+      const contractionProgress = Math.min(this.contractionTime / this.contractionDuration, 1.0)
+      // Use easeOutCubic for smooth deceleration
+      const eased = 1 - Math.pow(1 - contractionProgress, 3)
+      // Contract from initial size (whatever protostar was) to final main sequence size
+      this.currentRadius = THREE.MathUtils.lerp(this.initialRadius, this.starRadius, eased)
+    } else {
+      this.currentRadius = this.starRadius
+    }
+
+    // Pulse effect for star (subtle breathing) - only after fade in
     const pulse = Math.sin(this.time * 0.5) * 0.02 + 1
-    this.star.scale.setScalar(pulse)
+    const targetScale = (this.currentRadius / this.starRadius) * pulse
+    this.star.scale.setScalar(targetScale)
 
     // Pulsing light intensity
     const lightPulse = Math.sin(this.time * 0.7) * 2 + 15
@@ -166,8 +189,8 @@ export class Star {
         positions[i3 + 2] ** 2
       )
 
-      // Reset particles that go too far (continuous solar wind)
-      if (distance > this.starRadius * 2.5) {
+      // Reset particles that go too far (continuous stellar wind) - let them travel MUCH further
+      if (distance > this.starRadius * 15) { // Particles travel 15x star radius before resetting
         const theta = Math.random() * Math.PI * 2
         const phi = Math.acos(2 * Math.random() - 1)
 
@@ -175,7 +198,7 @@ export class Star {
         positions[i3 + 1] = this.starRadius * Math.sin(phi) * Math.sin(theta)
         positions[i3 + 2] = this.starRadius * Math.cos(phi)
 
-        const speed = 0.02 + Math.random() * 0.05
+        const speed = 0.03 + Math.random() * 0.08 // Match initial speed
         velocities[i3] = positions[i3] / this.starRadius * speed
         velocities[i3 + 1] = positions[i3 + 1] / this.starRadius * speed
         velocities[i3 + 2] = positions[i3 + 2] / this.starRadius * speed

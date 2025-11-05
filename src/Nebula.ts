@@ -33,9 +33,9 @@ export class Nebula {
   private lastColorMix = -1
 
   private readonly protostarGeometryRadius = 0.5 // Base radius of the sphere geometry
-  private protostarBaseScale = 0.6
-  private protostarMaxScale = 6.0 // Max size during accretion (puffy protostar)
-  private protostarFinalScale = 4.8 // Final size after fusion ignition (contracts slightly)
+  private protostarBaseScale = 1.2
+  private protostarMaxScale = 12.0 // Max size during accretion (puffy protostar)
+  private protostarFinalScale = 9.6 // Final size after fusion ignition (contracts slightly)
   private captureRadiusMultiplier = 1.15 // How much bigger than protostar visual size
   private stuckParticleCount = 0
 
@@ -371,6 +371,11 @@ export class Nebula {
 
   public getCollapseProgress(): number {
     return this.collapseProgress
+  }
+
+  public getProtostarRadius(): number {
+    // Return actual world-space radius of protostar
+    return this.protostar.scale.x * this.protostarGeometryRadius
   }
 
   public dispose(): void {
