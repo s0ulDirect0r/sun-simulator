@@ -2,6 +2,15 @@ import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
 import { Nebula } from './Nebula'
+import { Star } from './Star'
+import { IgnitionBurst } from './IgnitionBurst'
+
+enum SimulationPhase {
+  NEBULA_COLLAPSE = 'NEBULA_COLLAPSE',
+  MAIN_SEQUENCE = 'MAIN_SEQUENCE',
+  RED_GIANT = 'RED_GIANT',
+  SUPERNOVA = 'SUPERNOVA'
+}
 
 class SunSimulator {
   private scene: THREE.Scene
@@ -9,8 +18,17 @@ class SunSimulator {
   private renderer: THREE.WebGLRenderer
   private controls: OrbitControls
   private canvas: HTMLCanvasElement
-  private nebula: Nebula
+  private nebula: Nebula | null = null
+  private star: Star | null = null
+  private ignitionBurst: IgnitionBurst | null = null
   private clock: THREE.Clock
+  private currentPhase: SimulationPhase = SimulationPhase.NEBULA_COLLAPSE
+  private transitionProgress: number = 0
+  private transitionDuration: number = 3.0
+  private phaseElement: HTMLElement | null = null
+  private debugRadiusElement: HTMLElement | null = null
+  private lastPhaseText = ''
+  private lastDebugText = ''
 
   constructor() {
     // Get canvas element
@@ -22,6 +40,8 @@ class SunSimulator {
     // Initialize scene
     this.scene = new THREE.Scene()
     this.scene.background = new THREE.Color(0x000000)
+    this.phaseElement = document.getElementById('current-phase')
+    this.debugRadiusElement = document.getElementById('debug-radius')
 
     // Initialize camera
     this.camera = new THREE.PerspectiveCamera(
@@ -88,10 +108,37 @@ class SunSimulator {
   }
 
   private updatePhaseInfo(phase: string): void {
-    const phaseElement = document.getElementById('current-phase')
-    if (phaseElement) {
-      phaseElement.textContent = phase
+    if (phase === this.lastPhaseText) {
+      return
     }
+
+    this.lastPhaseText = phase
+
+    if (this.phaseElement) {
+      this.phaseElement.textContent = phase
+    }
+  }
+
+  private updateNebulaTelemetry(avgRadius: number, collapseProgress: number): void {
+    const debugText = `avg radius: ${avgRadius.toFixed(1)} | collapse: ${(collapseProgress * 100).toFixed(0)}%`
+
+    if (this.debugRadiusElement && debugText !== this.lastDebugText) {
+      this.debugRadiusElement.textContent = debugText
+      this.lastDebugText = debugText
+    }
+
+    let phaseText: string
+    if (collapseProgress < 0.25) {
+      phaseText = 'Phase 1: Nebula Collapse — Gravity Stirring the Cloud'
+    } else if (collapseProgress < 0.6) {
+      phaseText = 'Phase 1: Nebula Collapse — Accretion Disk Forming'
+    } else if (collapseProgress < 0.9) {
+      phaseText = 'Phase 1: Nebula Collapse — Protostar Ignition'
+    } else {
+      phaseText = 'Phase 1: Nebula Collapse — Core Stabilizing'
+    }
+
+    this.updatePhaseInfo(phaseText)
   }
 
   private animate(): void {
@@ -103,11 +150,92 @@ class SunSimulator {
     // Update controls
     this.controls.update()
 
-    // Update nebula physics
-    this.nebula.update(deltaTime)
+    // Update current phase
+    this.updatePhaseLogic(deltaTime)
+    if (this.ignitionBurst) {
+      this.ignitionBurst.update(deltaTime)
+      if (!this.ignitionBurst.active) {
+        this.ignitionBurst = null
+      }
+    }
 
     // Render scene
     this.renderer.render(this.scene, this.camera)
+  }
+
+  private updatePhaseLogic(deltaTime: number): void {
+    switch (this.currentPhase) {
+      case SimulationPhase.NEBULA_COLLAPSE:
+        if (this.nebula) {
+          this.nebula.update(deltaTime)
+
+          const avgRadius = this.nebula.getAverageRadius()
+          const collapseProgress = this.nebula.getCollapseProgress()
+
+          this.updateNebulaTelemetry(avgRadius, collapseProgress)
+
+          if (collapseProgress >= 0.92) {
+            this.startTransitionToMainSequence()
+          }
+        }
+        break
+
+      case SimulationPhase.MAIN_SEQUENCE:
+        if (this.star) {
+          this.star.update(deltaTime)
+        }
+        break
+
+      case SimulationPhase.RED_GIANT:
+        // TODO: Phase 3 implementation
+        break
+
+      case SimulationPhase.SUPERNOVA:
+        // TODO: Phase 4 implementation
+        break
+    }
+  }
+
+  private startTransitionToMainSequence(): void {
+    console.log('Starting transition to main sequence star...')
+
+    // Create star
+    this.star = new Star(this.scene)
+    this.ignitionBurst = new IgnitionBurst(this.scene)
+
+    // Fade out and dispose of nebula over time
+    if (this.nebula) {
+      // Start fade animation
+      this.transitionProgress = 0
+      const fadeInterval = setInterval(() => {
+        this.transitionProgress += 0.016
+
+        if (this.nebula && this.transitionProgress < this.transitionDuration) {
+          // Fade nebula opacity
+          const opacity = 1 - (this.transitionProgress / this.transitionDuration)
+          this.nebula['material'].opacity = opacity * 0.8
+          this.nebula['particles'].visible = opacity > 0.1
+        } else {
+          // Transition complete
+          if (this.nebula) {
+            this.scene.remove(this.nebula['particles'])
+            this.scene.remove(this.nebula['protostar'])
+            this.scene.remove(this.nebula['protostarLight'])
+            this.nebula.dispose()
+            this.nebula = null
+          }
+          clearInterval(fadeInterval)
+        }
+      }, 16)
+    }
+
+    // Update phase
+    this.currentPhase = SimulationPhase.MAIN_SEQUENCE
+    this.lastDebugText = ''
+    if (this.debugRadiusElement) {
+      this.debugRadiusElement.textContent = ''
+    }
+    this.updatePhaseInfo('Phase 2: Main Sequence Star')
   }
 }
 
