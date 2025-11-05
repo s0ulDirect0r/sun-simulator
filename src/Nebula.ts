@@ -34,7 +34,8 @@ export class Nebula {
 
   private readonly protostarGeometryRadius = 0.5 // Base radius of the sphere geometry
   private protostarBaseScale = 0.6
-  private protostarMaxScale = 4.5
+  private protostarMaxScale = 6.0 // Max size during accretion (puffy protostar)
+  private protostarFinalScale = 4.8 // Final size after fusion ignition (contracts slightly)
   private captureRadiusMultiplier = 1.15 // How much bigger than protostar visual size
   private stuckParticleCount = 0
 
@@ -176,31 +177,10 @@ export class Nebula {
       // Star has reached critical mass - will continue to grow via scale but won't capture more particles
     }
 
-    // Trigger particle burst at ignition threshold (one-time event)
+    // Mark when fusion ignition occurs (for visual effects, no particle burst)
     if (this.collapseProgress >= this.ignitionThreshold && !this.ignitionBurstTriggered) {
       this.ignitionBurstTriggered = true
-
-      // Eject 15% of stuck particles in a radial burst
-      const burstCount = Math.floor(this.stuckParticleCount * 0.15)
-      let ejected = 0
-
-      for (let i = 0; i < this.particleCount && ejected < burstCount; i++) {
-        if (this.stuck[i] > 0.5 && Math.random() < 0.15) {
-          // Mark as bursting (0.5 = intermediate state)
-          this.stuck[i] = 0.5
-
-          // Calculate outward velocity based on angular position
-          const theta = this.stuckTheta[i]
-          const phi = this.stuckPhi[i]
-          const burstSpeed = 0.15 + Math.random() * 0.1 // Variable burst speed
-
-          velocities[i * 3] = Math.sin(phi) * Math.cos(theta) * burstSpeed
-          velocities[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * burstSpeed
-          velocities[i * 3 + 2] = Math.cos(phi) * burstSpeed
-
-          ejected++
-        }
-      }
+      // Fusion has ignited - visual changes handled in updateProtostarGlow()
     }
 
     for (let i = 0; i < this.particleCount; i++) {
@@ -231,22 +211,6 @@ export class Nebula {
 
         totalDistance += radius
         continue // Skip physics for stuck particles
-      }
-
-      // Handle bursting particles (value = 0.5) - ejected during ignition
-      if (this.stuck[i] > 0.4 && this.stuck[i] < 0.6) {
-        // Bursting particles get brighter yellow-white glow
-        const burstColor = new THREE.Color(0xffee88)
-        colorsArray[i3] = burstColor.r
-        colorsArray[i3 + 1] = burstColor.g
-        colorsArray[i3 + 2] = burstColor.b
-
-        // After moving far enough, convert to free particles
-        if (distance > protostarRadius * 2) {
-          this.stuck[i] = 0 // Become free
-        }
-
-        // Fall through to apply physics
       }
 
       // Check if free particle should stick (only if critical mass not yet reached)
@@ -417,7 +381,17 @@ export class Nebula {
   }
 
   private updateProtostarGlow(progress: number): void {
-    const targetScale = THREE.MathUtils.lerp(this.protostarBaseScale, this.protostarMaxScale, progress)
+    // Calculate target scale based on stage
+    // Pre-ignition: grows to max (6.0), Post-ignition: contracts to final (4.8)
+    let targetScale: number
+    if (progress < this.ignitionThreshold) {
+      // Pre-ignition: grow from base to max
+      targetScale = THREE.MathUtils.lerp(this.protostarBaseScale, this.protostarMaxScale, progress / this.ignitionThreshold)
+    } else {
+      // Post-ignition: contract from max to final over 90-95% range
+      const contractionProgress = (progress - this.ignitionThreshold) / (this.stabilizationThreshold - this.ignitionThreshold)
+      targetScale = THREE.MathUtils.lerp(this.protostarMaxScale, this.protostarFinalScale, Math.min(contractionProgress, 1.0))
+    }
 
     // Determine ignition stage and adjust visual parameters
     let pulseFrequency = 2
@@ -427,34 +401,31 @@ export class Nebula {
     let scaleBoost = 1.0
 
     if (progress >= this.stabilizationThreshold) {
-      // Stage 4: Stabilization (95-100%)
+      // Stage 4: Main Sequence Stability (95-100%)
       const stageProgress = (progress - this.stabilizationThreshold) / (1 - this.stabilizationThreshold)
-      pulseFrequency = THREE.MathUtils.lerp(5, 2, stageProgress) // Slow down to normal
-      pulseAmplitude = THREE.MathUtils.lerp(0.18, 0.08, stageProgress) // Reduce amplitude
-      emissiveBoost = THREE.MathUtils.lerp(1.4, 1.0, stageProgress) // Return to normal
-      lightIntensityBoost = THREE.MathUtils.lerp(1.5, 1.0, stageProgress)
+      pulseFrequency = THREE.MathUtils.lerp(1, 0.5, stageProgress) // Slow gentle breathing
+      pulseAmplitude = THREE.MathUtils.lerp(0.05, 0.02, stageProgress) // Nearly stable
+      emissiveBoost = 2.0 // Maintain bright fusion-powered glow
+      lightIntensityBoost = THREE.MathUtils.lerp(2.2, 2.0, stageProgress) // Maintain high brightness
 
-      // Smoothly reduce the ignition burst scale back to 1.0
-      this.ignitionBurstScale = THREE.MathUtils.lerp(this.ignitionBurstScale, 1.0, 0.05)
-      scaleBoost = this.ignitionBurstScale
+      scaleBoost = 1.0
     } else if (progress >= this.ignitionThreshold) {
-      // Stage 3: Ignition Burst (90-95%)
+      // Stage 3: Fusion Ignition & Contraction (90-95%)
       const stageProgress = (progress - this.ignitionThreshold) / (this.stabilizationThreshold - this.ignitionThreshold)
-      pulseFrequency = 5 // Rapid pulsing
-      pulseAmplitude = 0.18 // Large amplitude
-      emissiveBoost = THREE.MathUtils.lerp(1.2, 1.8, stageProgress) // Dramatic brightness spike
+      pulseFrequency = THREE.MathUtils.lerp(4, 1, stageProgress) // Slowing down as it stabilizes
+      pulseAmplitude = THREE.MathUtils.lerp(0.15, 0.05, stageProgress) // Reducing amplitude
+      emissiveBoost = THREE.MathUtils.lerp(2.5, 2.0, stageProgress) // Dramatic brightness spike at start, then settle
 
-      // Peak light intensity at mid-ignition (92-93%)
-      const midPoint = 0.4 // 40% through the 90-95% range
-      if (stageProgress < midPoint) {
-        lightIntensityBoost = THREE.MathUtils.lerp(1.3, 2.5, stageProgress / midPoint)
+      // Peak light intensity at ignition moment, then settle
+      const peakPoint = 0.2 // Peak early (90-91%)
+      if (stageProgress < peakPoint) {
+        lightIntensityBoost = THREE.MathUtils.lerp(1.3, 3.5, stageProgress / peakPoint) // Dramatic flash
       } else {
-        lightIntensityBoost = THREE.MathUtils.lerp(2.5, 1.8, (stageProgress - midPoint) / (1 - midPoint))
+        lightIntensityBoost = THREE.MathUtils.lerp(3.5, 2.2, (stageProgress - peakPoint) / (1 - peakPoint))
       }
 
-      // Rapid expansion during ignition
-      this.ignitionBurstScale = THREE.MathUtils.lerp(1.0, 1.3, stageProgress)
-      scaleBoost = this.ignitionBurstScale
+      // No scale boost - contraction is handled in targetScale calculation above
+      scaleBoost = 1.0
     } else if (progress >= this.preIgnitionThreshold) {
       // Stage 2: Pre-ignition Intensifies (85-90%)
       const stageProgress = (progress - this.preIgnitionThreshold) / (this.ignitionThreshold - this.preIgnitionThreshold)
@@ -483,28 +454,31 @@ export class Nebula {
     const baseEmissive = THREE.MathUtils.lerp(2.2, 6.0, progress)
     protostarMaterial.emissiveIntensity = baseEmissive * emissiveBoost
 
-    // Color shifts to yellow-white during ignition burst, then back to orange
+    // Color transitions: orange protostar → yellow-white main sequence star
     let warmHue: number
     let saturation: number
     let lightness: number
 
-    if (progress >= this.ignitionThreshold && progress < this.stabilizationThreshold) {
-      // Stage 3: Shift to bright yellow-white during ignition
-      const stageProgress = (progress - this.ignitionThreshold) / (this.stabilizationThreshold - this.ignitionThreshold)
-      warmHue = THREE.MathUtils.lerp(0.06, 0.15, stageProgress * 0.8) // Shift toward yellow
-      saturation = THREE.MathUtils.lerp(1.0, 0.7, stageProgress * 0.6) // Reduce saturation for white-hot
-      lightness = THREE.MathUtils.lerp(0.65, 0.85, stageProgress) // Very bright
-    } else if (progress >= this.stabilizationThreshold) {
-      // Stage 4: Return to warm orange
-      const stageProgress = (progress - this.stabilizationThreshold) / (1 - this.stabilizationThreshold)
-      warmHue = THREE.MathUtils.lerp(0.15, 0.08, stageProgress)
-      saturation = THREE.MathUtils.lerp(0.7, 1.0, stageProgress)
-      lightness = THREE.MathUtils.lerp(0.85, 0.75, stageProgress)
-    } else {
-      // Stages 1-2: Normal warm progression
-      warmHue = THREE.MathUtils.lerp(0.04, 0.06, progress)
+    if (progress >= this.ignitionThreshold) {
+      // Post-ignition (90-100%): Yellow-white main sequence star
+      const timeSinceIgnition = progress - this.ignitionThreshold
+      const ignitionProgress = timeSinceIgnition / (1.0 - this.ignitionThreshold)
+
+      // Rapid shift to yellow-white at ignition, then stabilize
+      warmHue = THREE.MathUtils.lerp(0.06, 0.14, Math.min(ignitionProgress * 2, 1.0)) // Bright yellow
+      saturation = THREE.MathUtils.lerp(1.0, 0.75, Math.min(ignitionProgress * 1.5, 1.0)) // Slightly desaturated (white-hot)
+      lightness = THREE.MathUtils.lerp(0.65, 0.82, Math.min(ignitionProgress, 1.0)) // Very bright
+    } else if (progress >= this.preIgnitionThreshold) {
+      // Pre-ignition (85-90%): Heating up, starting to shift
+      const stageProgress = (progress - this.preIgnitionThreshold) / (this.ignitionThreshold - this.preIgnitionThreshold)
+      warmHue = THREE.MathUtils.lerp(0.04, 0.06, stageProgress)
       saturation = 1.0
-      lightness = 0.55 + progress * 0.2 + (emissiveBoost - 1.0) * 0.1
+      lightness = THREE.MathUtils.lerp(0.6, 0.65, stageProgress)
+    } else {
+      // Early phases (0-85%): Orange protostar
+      warmHue = THREE.MathUtils.lerp(0.04, 0.04, progress)
+      saturation = 1.0
+      lightness = 0.55 + progress * 0.05 + (emissiveBoost - 1.0) * 0.1
     }
 
     const warmColor = new THREE.Color().setHSL(warmHue, saturation, lightness)
