@@ -1,2 +1,3 @@
-BEFORE ANYTHING ELSE: run
-  'bd onboard' and follow the instructions
+# Sun Simulator
+
+A web-based interactive simulation visualizing the complete lifecycle of a star.

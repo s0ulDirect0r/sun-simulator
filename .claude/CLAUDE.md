@@ -1,6 +1,3 @@
-BEFORE ANYTHING ELSE: run
-  'bd onboard' and follow the instructions
-  
 # Sun Simulator - Project Context
 
 ## Your Role
@@ -56,14 +53,3 @@ You're building a showpiece that demonstrates technical skill and creativity. Wh
 
 **Project Status**: Specification complete - Ready to begin implementation
 **Focus**: Foundation setup and initial Three.js scene development
-
-## Issue Tracking
-
-Use the `bd` command for all issue tracking instead of markdown TODOs:
-
-- Create issues: `bd create "Task description" -p 1 --json`
-- Find work: `bd ready --json`
-- Update status: `bd update <id> --status in_progress --json`
-- View details: `bd show <id> --json`
-
-Use `--json` flags for programmatic parsing.
