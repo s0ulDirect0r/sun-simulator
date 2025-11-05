@@ -1,72 +1,110 @@
 import * as THREE from 'three'
 
 export class Nebula {
+  private readonly particleCount = 20000
+
   private particles: THREE.Points
-  private particleCount: number = 5000
   private positions: Float32Array
   private velocities: Float32Array
   private colors: Float32Array
+  private initialColors: Float32Array
+  private stuck: Float32Array // 0 = free, 1 = stuck
+  private stuckRadius: Float32Array // radius at which particle stuck
+  private stuckTheta: Float32Array // angular position (theta)
+  private stuckPhi: Float32Array // angular position (phi)
   private geometry: THREE.BufferGeometry
   private material: THREE.PointsMaterial
-  private time: number = 0
-  private collapseSpeed: number = 0.02
+
+  private time = 0
+  private simulationSpeed = 0.035
+  private collapseSpeed = 9.5 // Increased for dramatic visible streaming
+  private swirlStrength = 0.001
+  private diskPullStrength = 0.0016
+  private turbulenceStrength = 0.00022
+  private baseDrag = 0.992
+  private softening = 1.2
+  private maxVelocity = 2.5 // Increased to allow faster streaming
+  private colorUpdateThreshold = 0.025
+
+  private averageRadius = 0
+  private collapseProgress = 0
+  private initialAverageRadius = 0
+  private targetAverageRadius = 6
+  private lastColorMix = -1
+
+  private readonly protostarGeometryRadius = 0.5 // Base radius of the sphere geometry
+  private protostarBaseScale = 0.6
+  private protostarMaxScale = 4.5
+  private captureRadiusMultiplier = 1.15 // How much bigger than protostar visual size
+  private stuckParticleCount = 0
+
+  // Multi-stage ignition thresholds
+  private readonly preIgnitionThreshold = 0.85
+  private readonly ignitionThreshold = 0.90
+  private readonly stabilizationThreshold = 0.95
+  private ignitionBurstScale = 1.0 // Temporary scale boost during ignition
+  private ignitionBurstTriggered = false // One-time particle ejection event
+
+  // Critical mass - star stops capturing particles to preserve nebula material
+  private readonly criticalMassThreshold = 0.65
+  private criticalMassReached = false
+
   private protostar!: THREE.Mesh
   private protostarLight!: THREE.PointLight
   private scene: THREE.Scene
 
   constructor(scene: THREE.Scene) {
     this.scene = scene
-    this.particleCount = 5000
 
-    // Initialize geometry
     this.geometry = new THREE.BufferGeometry()
-
-    // Create position, velocity, and color arrays
     this.positions = new Float32Array(this.particleCount * 3)
     this.velocities = new Float32Array(this.particleCount * 3)
     this.colors = new Float32Array(this.particleCount * 3)
+    this.initialColors = new Float32Array(this.particleCount * 3)
+    this.stuck = new Float32Array(this.particleCount) // 0 = free
+    this.stuckRadius = new Float32Array(this.particleCount)
+    this.stuckTheta = new Float32Array(this.particleCount)
+    this.stuckPhi = new Float32Array(this.particleCount)
 
-    // Initialize particles in a spherical cloud
     this.initializeParticles()
 
-    // Set up buffer attributes
     this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3))
     this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3))
 
-    // Create particle material with vertex colors
     this.material = new THREE.PointsMaterial({
-      size: 0.5,
+      size: 0.9, // Increased for better visibility
       vertexColors: true,
       transparent: true,
-      opacity: 0.8,
+      opacity: 1.0, // Full opacity for more intense glow
       blending: THREE.AdditiveBlending,
-      depthWrite: false
+      depthWrite: false,
+      sizeAttenuation: true
     })
 
-    // Create particle system
     this.particles = new THREE.Points(this.geometry, this.material)
-    scene.add(this.particles)
+    this.scene.add(this.particles)
 
-    // Create protostar core
     this.createProtostar()
+
+    this.averageRadius = this.computeAverageRadius()
+    this.initialAverageRadius = this.averageRadius
+    this.collapseProgress = 0
   }
 
   private createProtostar(): void {
-    // Create small glowing sphere at center
-    const geometry = new THREE.SphereGeometry(0.5, 32, 32)
+    const geometry = new THREE.SphereGeometry(0.5, 48, 48)
     const material = new THREE.MeshStandardMaterial({
-      color: 0xff6600,
+      color: 0xff7033,
       emissive: 0xff3300,
-      emissiveIntensity: 2,
-      roughness: 0.2,
-      metalness: 0.1
+      emissiveIntensity: 2.2,
+      roughness: 0.25,
+      metalness: 0.05
     })
 
     this.protostar = new THREE.Mesh(geometry, material)
     this.scene.add(this.protostar)
 
-    // Add dedicated light for protostar glow
-    this.protostarLight = new THREE.PointLight(0xff6600, 2, 50)
+    this.protostarLight = new THREE.PointLight(0xff7033, 4, 60, 2)
     this.protostarLight.position.set(0, 0, 0)
     this.scene.add(this.protostarLight)
   }
@@ -85,98 +123,290 @@ export class Nebula {
       this.positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
       this.positions[i3 + 2] = radius * Math.cos(phi)
 
-      // Initialize velocities (slight random motion)
-      this.velocities[i3] = (Math.random() - 0.5) * 0.02
-      this.velocities[i3 + 1] = (Math.random() - 0.5) * 0.02
-      this.velocities[i3 + 2] = (Math.random() - 0.5) * 0.02
+      this.velocities[i3] = (Math.random() - 0.5) * 0.003
+      this.velocities[i3 + 1] = (Math.random() - 0.5) * 0.003
+      this.velocities[i3 + 2] = (Math.random() - 0.5) * 0.003
 
-      // Set colors (bluish-purple nebula with some variation)
-      const colorVariation = Math.random() * 0.3
-      this.colors[i3] = 0.3 + colorVariation     // Red
-      this.colors[i3 + 1] = 0.4 + colorVariation // Green
-      this.colors[i3 + 2] = 0.8 + colorVariation // Blue (dominant)
+      // Set colors (bluish-purple nebula with some variation) - brighter for more glow
+      const colorVariation = Math.random() * 0.4
+      const r = 0.5 + colorVariation
+      const g = 0.6 + colorVariation
+      const b = 1.0 + colorVariation * 0.5
+
+      this.colors[i3] = r
+      this.colors[i3 + 1] = g
+      this.colors[i3 + 2] = b
+
+      this.initialColors[i3] = r
+      this.initialColors[i3 + 1] = g
+      this.initialColors[i3 + 2] = b
     }
   }
 
   public update(deltaTime: number): void {
     this.time += deltaTime
 
-    const positions = this.geometry.attributes.position.array as Float32Array
-    const velocities = this.velocities
+    // Update protostar scale BEFORE processing particles so they can track it
+    this.updateProtostarGlow(this.collapseProgress)
 
-    // Update each particle
+    const positions = this.geometry.getAttribute('position').array as Float32Array
+    const velocities = this.velocities
+    const colorsAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
+    const colorsArray = colorsAttr.array as Float32Array
+
+    const frameFactor = Math.min(deltaTime * 60 * this.simulationSpeed, 3)
+    const swirl = this.swirlStrength * frameFactor
+    const diskPull = this.diskPullStrength * frameFactor
+    const turbulence = this.turbulenceStrength * frameFactor
+
+    let totalDistance = 0
+    let freeParticleDistance = 0
+    let freeParticleCount = 0
+    const alignmentStrength = THREE.MathUtils.lerp(0.04, 0.1, this.collapseProgress)
+
+    // Use the actual protostar's current scale (includes pulsing)
+    const currentProtostarScale = this.protostar.scale.x
+    // Actual world-space radius = scale * geometry base radius
+    const protostarRadius = currentProtostarScale * this.protostarGeometryRadius
+    const captureRadius = protostarRadius * this.captureRadiusMultiplier
+
+    // Check if star has reached critical mass - stop capturing more particles
+    if (this.collapseProgress >= this.criticalMassThreshold && !this.criticalMassReached) {
+      this.criticalMassReached = true
+      // Star has reached critical mass - will continue to grow via scale but won't capture more particles
+    }
+
+    // Trigger particle burst at ignition threshold (one-time event)
+    if (this.collapseProgress >= this.ignitionThreshold && !this.ignitionBurstTriggered) {
+      this.ignitionBurstTriggered = true
+
+      // Eject 15% of stuck particles in a radial burst
+      const burstCount = Math.floor(this.stuckParticleCount * 0.15)
+      let ejected = 0
+
+      for (let i = 0; i < this.particleCount && ejected < burstCount; i++) {
+        if (this.stuck[i] > 0.5 && Math.random() < 0.15) {
+          // Mark as bursting (0.5 = intermediate state)
+          this.stuck[i] = 0.5
+
+          // Calculate outward velocity based on angular position
+          const theta = this.stuckTheta[i]
+          const phi = this.stuckPhi[i]
+          const burstSpeed = 0.15 + Math.random() * 0.1 // Variable burst speed
+
+          velocities[i * 3] = Math.sin(phi) * Math.cos(theta) * burstSpeed
+          velocities[i * 3 + 1] = Math.sin(phi) * Math.sin(theta) * burstSpeed
+          velocities[i * 3 + 2] = Math.cos(phi) * burstSpeed
+
+          ejected++
+        }
+      }
+    }
+
     for (let i = 0; i < this.particleCount; i++) {
       const i3 = i * 3
 
-      // Get current position
       const x = positions[i3]
       const y = positions[i3 + 1]
       const z = positions[i3 + 2]
 
-      // Calculate distance from center
       const distance = Math.sqrt(x * x + y * y + z * z)
 
-      // Gravitational collapse - pull particles toward center
-      if (distance > 0.1) {
-        const force = this.collapseSpeed / (distance * distance)
+      // Handle stuck particles (value = 1.0) - position them on the protostar surface
+      if (this.stuck[i] > 0.9) {
+        const theta = this.stuckTheta[i]
+        const phi = this.stuckPhi[i]
+        // Stuck particles ride on the surface as the protostar grows
+        const radius = protostarRadius * this.stuckRadius[i]
 
-        velocities[i3] -= (x / distance) * force
-        velocities[i3 + 1] -= (y / distance) * force
-        velocities[i3 + 2] -= (z / distance) * force
+        positions[i3] = radius * Math.sin(phi) * Math.cos(theta)
+        positions[i3 + 1] = radius * Math.sin(phi) * Math.sin(theta)
+        positions[i3 + 2] = radius * Math.cos(phi)
+
+        // Stuck particles glow with protostar color
+        const glowColor = new THREE.Color(0xffa144)
+        colorsArray[i3] = glowColor.r
+        colorsArray[i3 + 1] = glowColor.g
+        colorsArray[i3 + 2] = glowColor.b
+
+        totalDistance += radius
+        continue // Skip physics for stuck particles
       }
 
-      // Apply damping to simulate drag
-      velocities[i3] *= 0.99
-      velocities[i3 + 1] *= 0.99
-      velocities[i3 + 2] *= 0.99
+      // Handle bursting particles (value = 0.5) - ejected during ignition
+      if (this.stuck[i] > 0.4 && this.stuck[i] < 0.6) {
+        // Bursting particles get brighter yellow-white glow
+        const burstColor = new THREE.Color(0xffee88)
+        colorsArray[i3] = burstColor.r
+        colorsArray[i3 + 1] = burstColor.g
+        colorsArray[i3 + 2] = burstColor.b
 
-      // Add slight swirl for accretion disk formation
-      const swirl = 0.001
-      const tempVx = velocities[i3]
-      velocities[i3] -= y * swirl
-      velocities[i3 + 1] += tempVx * swirl
+        // After moving far enough, convert to free particles
+        if (distance > protostarRadius * 2) {
+          this.stuck[i] = 0 // Become free
+        }
 
-      // Update positions based on velocities
+        // Fall through to apply physics
+      }
+
+      // Check if free particle should stick (only if critical mass not yet reached)
+      if (distance < captureRadius && this.stuck[i] < 0.5 && !this.criticalMassReached) {
+        this.stuck[i] = 1
+        // Store as normalized radius factor - right at the surface with slight variation
+        this.stuckRadius[i] = 0.98 + Math.random() * 0.04
+
+        // Convert current position to spherical coordinates
+        if (distance > 0.001) {
+          this.stuckTheta[i] = Math.atan2(y, x)
+          this.stuckPhi[i] = Math.acos(THREE.MathUtils.clamp(z / distance, -1, 1))
+        } else {
+          // Random position if too close to center
+          this.stuckTheta[i] = Math.random() * Math.PI * 2
+          this.stuckPhi[i] = Math.acos(2 * Math.random() - 1)
+        }
+
+        this.stuckParticleCount++
+        continue
+      }
+
+      // Regular physics for free particles
+      freeParticleDistance += distance
+      freeParticleCount++
+
+      if (distance > 0.001) {
+        const invDistance = 1 / distance
+        const nx = x * invDistance
+        const ny = y * invDistance
+        const nz = z * invDistance
+
+        // Apply physics multiplier during pre-ignition phase
+        let physicsMultiplier = 1.0
+        if (this.collapseProgress >= this.preIgnitionThreshold && this.collapseProgress < this.ignitionThreshold) {
+          // Pre-ignition: increase gravitational pull (1.5x faster)
+          physicsMultiplier = 1.5
+        }
+
+        const pull = (this.collapseSpeed * frameFactor * physicsMultiplier) / Math.pow(distance + this.softening, 2)
+
+        velocities[i3] -= nx * pull
+        velocities[i3 + 1] -= ny * pull
+        velocities[i3 + 2] -= nz * pull
+
+        const radialVelocity =
+          velocities[i3] * nx + velocities[i3 + 1] * ny + velocities[i3 + 2] * nz
+
+        const tangentialX = velocities[i3] - radialVelocity * nx
+        const tangentialY = velocities[i3 + 1] - radialVelocity * ny
+        const tangentialZ = velocities[i3 + 2] - radialVelocity * nz
+        velocities[i3] -= tangentialX * alignmentStrength
+        velocities[i3 + 1] -= tangentialY * alignmentStrength
+        velocities[i3 + 2] -= tangentialZ * alignmentStrength
+
+        if (radialVelocity > -0.02) {
+          const inwardBias = THREE.MathUtils.lerp(0.4, 1.1, this.collapseProgress)
+          const correction = (radialVelocity + 0.02) * inwardBias
+          velocities[i3] -= nx * correction
+          velocities[i3 + 1] -= ny * correction
+          velocities[i3 + 2] -= nz * correction
+        }
+      }
+
+      velocities[i3] *= this.baseDrag
+      velocities[i3 + 1] *= this.baseDrag
+      velocities[i3 + 2] *= this.baseDrag
+
+      // Encourage accretion disk (orbit around Y axis, fall toward equatorial plane)
+      velocities[i3] += -z * swirl
+      velocities[i3 + 2] += x * swirl
+      velocities[i3 + 1] -= y * diskPull * (0.3 + this.collapseProgress)
+
+      // Gentle turbulence for swirling wisps
+      velocities[i3] +=
+        (Math.sin(this.time * 0.35 + i * 0.21) + Math.cos(this.time * 0.6 + i * 0.13)) *
+        turbulence *
+        0.5
+      velocities[i3 + 1] += Math.sin(this.time * 0.27 + i * 0.37) * turbulence * 0.3
+      velocities[i3 + 2] +=
+        (Math.cos(this.time * 0.41 + i * 0.17) + Math.sin(this.time * 0.22 + i * 0.29)) *
+        turbulence *
+        0.5
+
+      velocities[i3] = THREE.MathUtils.clamp(velocities[i3], -this.maxVelocity, this.maxVelocity)
+      velocities[i3 + 1] = THREE.MathUtils.clamp(
+        velocities[i3 + 1],
+        -this.maxVelocity,
+        this.maxVelocity
+      )
+      velocities[i3 + 2] = THREE.MathUtils.clamp(
+        velocities[i3 + 2],
+        -this.maxVelocity,
+        this.maxVelocity
+      )
+
       positions[i3] += velocities[i3]
       positions[i3 + 1] += velocities[i3 + 1]
       positions[i3 + 2] += velocities[i3 + 2]
+
+      const newDistance = Math.sqrt(
+        positions[i3] * positions[i3] +
+          positions[i3 + 1] * positions[i3 + 1] +
+          positions[i3 + 2] * positions[i3 + 2]
+      )
+
+      // Color gradient for particles approaching the protostar
+      const approachThreshold = captureRadius * 1.5
+      if (newDistance < approachThreshold) {
+        const blend = THREE.MathUtils.clamp((approachThreshold - newDistance) / approachThreshold, 0, 1)
+        const glowColor = new THREE.Color(0xffa144)
+
+        colorsArray[i3] = THREE.MathUtils.lerp(colorsArray[i3], glowColor.r, blend * 0.45)
+        colorsArray[i3 + 1] = THREE.MathUtils.lerp(colorsArray[i3 + 1], glowColor.g, blend * 0.45)
+        colorsArray[i3 + 2] = THREE.MathUtils.lerp(colorsArray[i3 + 2], glowColor.b, blend * 0.45)
+      }
+
+      totalDistance += newDistance
     }
 
-    // Mark positions as needing update
     this.geometry.attributes.position.needsUpdate = true
+    colorsAttr.needsUpdate = true
+    this.particles.rotation.y += 0.0002 * frameFactor
 
-    // Rotate particles slowly for visual interest
-    this.particles.rotation.y += 0.0002
+    // Calculate collapse progress based on free particles
+    if (freeParticleCount > 0) {
+      this.averageRadius = freeParticleDistance / freeParticleCount
+    } else {
+      // All particles stuck - collapse complete
+      this.averageRadius = this.targetAverageRadius
+    }
 
-    // Update protostar as nebula collapses
-    const avgRadius = this.getAverageRadius()
-    const collapseProgress = Math.max(0, 1 - avgRadius / 40)
+    const collapseSpan = Math.max(this.initialAverageRadius - this.targetAverageRadius, 1)
+    this.collapseProgress = THREE.MathUtils.clamp(
+      (this.initialAverageRadius - this.averageRadius) / collapseSpan,
+      0,
+      1
+    )
 
-    // Grow protostar and increase its glow as nebula collapses
-    const targetSize = 0.5 + collapseProgress * 4
-    this.protostar.scale.setScalar(targetSize)
+    // Boost collapse progress based on stuck particle count for faster visual growth
+    const stuckRatio = this.stuckParticleCount / this.particleCount
+    this.collapseProgress = THREE.MathUtils.clamp(
+      this.collapseProgress + stuckRatio * 0.3,
+      0,
+      1
+    )
 
-    // Increase light intensity as collapse progresses
-    this.protostarLight.intensity = 2 + collapseProgress * 8
+    this.material.size = THREE.MathUtils.lerp(0.9, 0.4, this.collapseProgress)
+    this.material.opacity = THREE.MathUtils.lerp(1.0, 0.6, this.collapseProgress)
 
-    // Pulse effect for protostar
-    const pulse = Math.sin(this.time * 2) * 0.1 + 1
-    this.protostar.scale.multiplyScalar(pulse)
+    this.updateColorGradient(this.collapseProgress)
+    // Protostar is now updated at the START of the frame (before particle loop)
   }
 
   public getAverageRadius(): number {
-    const positions = this.geometry.attributes.position.array as Float32Array
-    let totalDistance = 0
+    return this.averageRadius
+  }
 
-    for (let i = 0; i < this.particleCount; i++) {
-      const i3 = i * 3
-      const x = positions[i3]
-      const y = positions[i3 + 1]
-      const z = positions[i3 + 2]
-      totalDistance += Math.sqrt(x * x + y * y + z * z)
-    }
-
-    return totalDistance / this.particleCount
+  public getCollapseProgress(): number {
+    return this.collapseProgress
   }
 
   public dispose(): void {
@@ -184,5 +414,145 @@ export class Nebula {
     this.material.dispose()
     this.protostar.geometry.dispose()
     ;(this.protostar.material as THREE.Material).dispose()
+  }
+
+  private updateProtostarGlow(progress: number): void {
+    const targetScale = THREE.MathUtils.lerp(this.protostarBaseScale, this.protostarMaxScale, progress)
+
+    // Determine ignition stage and adjust visual parameters
+    let pulseFrequency = 2
+    let pulseAmplitude = 0.1
+    let emissiveBoost = 1.0
+    let lightIntensityBoost = 1.0
+    let scaleBoost = 1.0
+
+    if (progress >= this.stabilizationThreshold) {
+      // Stage 4: Stabilization (95-100%)
+      const stageProgress = (progress - this.stabilizationThreshold) / (1 - this.stabilizationThreshold)
+      pulseFrequency = THREE.MathUtils.lerp(5, 2, stageProgress) // Slow down to normal
+      pulseAmplitude = THREE.MathUtils.lerp(0.18, 0.08, stageProgress) // Reduce amplitude
+      emissiveBoost = THREE.MathUtils.lerp(1.4, 1.0, stageProgress) // Return to normal
+      lightIntensityBoost = THREE.MathUtils.lerp(1.5, 1.0, stageProgress)
+
+      // Smoothly reduce the ignition burst scale back to 1.0
+      this.ignitionBurstScale = THREE.MathUtils.lerp(this.ignitionBurstScale, 1.0, 0.05)
+      scaleBoost = this.ignitionBurstScale
+    } else if (progress >= this.ignitionThreshold) {
+      // Stage 3: Ignition Burst (90-95%)
+      const stageProgress = (progress - this.ignitionThreshold) / (this.stabilizationThreshold - this.ignitionThreshold)
+      pulseFrequency = 5 // Rapid pulsing
+      pulseAmplitude = 0.18 // Large amplitude
+      emissiveBoost = THREE.MathUtils.lerp(1.2, 1.8, stageProgress) // Dramatic brightness spike
+
+      // Peak light intensity at mid-ignition (92-93%)
+      const midPoint = 0.4 // 40% through the 90-95% range
+      if (stageProgress < midPoint) {
+        lightIntensityBoost = THREE.MathUtils.lerp(1.3, 2.5, stageProgress / midPoint)
+      } else {
+        lightIntensityBoost = THREE.MathUtils.lerp(2.5, 1.8, (stageProgress - midPoint) / (1 - midPoint))
+      }
+
+      // Rapid expansion during ignition
+      this.ignitionBurstScale = THREE.MathUtils.lerp(1.0, 1.3, stageProgress)
+      scaleBoost = this.ignitionBurstScale
+    } else if (progress >= this.preIgnitionThreshold) {
+      // Stage 2: Pre-ignition Intensifies (85-90%)
+      const stageProgress = (progress - this.preIgnitionThreshold) / (this.ignitionThreshold - this.preIgnitionThreshold)
+      pulseFrequency = THREE.MathUtils.lerp(2, 4, stageProgress) // Accelerating pulse
+      pulseAmplitude = THREE.MathUtils.lerp(0.1, 0.15, stageProgress) // Growing amplitude
+      emissiveBoost = THREE.MathUtils.lerp(1.0, 1.2, stageProgress) // Building intensity
+      lightIntensityBoost = THREE.MathUtils.lerp(1.0, 1.3, stageProgress)
+    }
+    // Stage 1: Normal (0-85%) uses default values
+
+    // Apply scale with pulse and ignition burst
+    const pulse = Math.sin(this.time * pulseFrequency) * pulseAmplitude + 1
+    this.protostar.scale.setScalar(targetScale * scaleBoost * pulse)
+
+    // Apply light intensity with boost
+    const baseIntensity = THREE.MathUtils.lerp(3, 12, progress)
+    this.protostarLight.intensity = baseIntensity * lightIntensityBoost
+
+    // Expand light distance during ignition for wider bloom
+    const baseDistance = THREE.MathUtils.lerp(60, 90, progress)
+    const distanceBoost = lightIntensityBoost > 2.0 ? 1.3 : 1.0 // Wider at peak
+    this.protostarLight.distance = baseDistance * distanceBoost
+
+    // Apply emissive intensity with boost
+    const protostarMaterial = this.protostar.material as THREE.MeshStandardMaterial
+    const baseEmissive = THREE.MathUtils.lerp(2.2, 6.0, progress)
+    protostarMaterial.emissiveIntensity = baseEmissive * emissiveBoost
+
+    // Color shifts to yellow-white during ignition burst, then back to orange
+    let warmHue: number
+    let saturation: number
+    let lightness: number
+
+    if (progress >= this.ignitionThreshold && progress < this.stabilizationThreshold) {
+      // Stage 3: Shift to bright yellow-white during ignition
+      const stageProgress = (progress - this.ignitionThreshold) / (this.stabilizationThreshold - this.ignitionThreshold)
+      warmHue = THREE.MathUtils.lerp(0.06, 0.15, stageProgress * 0.8) // Shift toward yellow
+      saturation = THREE.MathUtils.lerp(1.0, 0.7, stageProgress * 0.6) // Reduce saturation for white-hot
+      lightness = THREE.MathUtils.lerp(0.65, 0.85, stageProgress) // Very bright
+    } else if (progress >= this.stabilizationThreshold) {
+      // Stage 4: Return to warm orange
+      const stageProgress = (progress - this.stabilizationThreshold) / (1 - this.stabilizationThreshold)
+      warmHue = THREE.MathUtils.lerp(0.15, 0.08, stageProgress)
+      saturation = THREE.MathUtils.lerp(0.7, 1.0, stageProgress)
+      lightness = THREE.MathUtils.lerp(0.85, 0.75, stageProgress)
+    } else {
+      // Stages 1-2: Normal warm progression
+      warmHue = THREE.MathUtils.lerp(0.04, 0.06, progress)
+      saturation = 1.0
+      lightness = 0.55 + progress * 0.2 + (emissiveBoost - 1.0) * 0.1
+    }
+
+    const warmColor = new THREE.Color().setHSL(warmHue, saturation, lightness)
+    protostarMaterial.color.copy(warmColor)
+    this.protostarLight.color.copy(warmColor)
+  }
+
+  private updateColorGradient(progress: number): void {
+    if (Math.abs(progress - this.lastColorMix) < this.colorUpdateThreshold) {
+      return
+    }
+
+    this.lastColorMix = progress
+
+    const warmColor = new THREE.Color(0xff7b42)
+    const colorsAttr = this.geometry.getAttribute('color') as THREE.BufferAttribute
+    const colorsArray = colorsAttr.array as Float32Array
+
+    for (let i = 0; i < this.particleCount; i++) {
+      const i3 = i * 3
+      colorsArray[i3] = THREE.MathUtils.lerp(this.initialColors[i3], warmColor.r, progress)
+      colorsArray[i3 + 1] = THREE.MathUtils.lerp(
+        this.initialColors[i3 + 1],
+        warmColor.g,
+        progress
+      )
+      colorsArray[i3 + 2] = THREE.MathUtils.lerp(
+        this.initialColors[i3 + 2],
+        warmColor.b,
+        progress
+      )
+    }
+
+    colorsAttr.needsUpdate = true
+  }
+
+  private computeAverageRadius(): number {
+    const positions = this.geometry.getAttribute('position').array as Float32Array
+    let total = 0
+
+    for (let i = 0; i < this.particleCount; i++) {
+      const i3 = i * 3
+      const x = positions[i3]
+      const y = positions[i3 + 1]
+      const z = positions[i3 + 2]
+      total += Math.sqrt(x * x + y * y + z * z)
+    }
+
+    return total / this.particleCount
   }
 }
