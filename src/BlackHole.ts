@@ -1,6 +1,7 @@
 import * as THREE from 'three'
 import { createEventHorizonMaterial } from './shaders/EventHorizonShader'
 import { createAccretionDiskMaterial } from './shaders/AccretionDiskShader'
+import { createJetTrailMaterial } from './shaders/JetTrailShader'
 
 export class BlackHole {
   private scene: THREE.Scene
@@ -10,13 +11,11 @@ export class BlackHole {
   private accretionDisk!: THREE.Mesh
   private accretionDiskMaterial!: THREE.ShaderMaterial
 
-  // Jets of matter escaping along poles
-  private jets!: THREE.Points
-  private jetsGeometry!: THREE.BufferGeometry
-  private jetsMaterial!: THREE.PointsMaterial
-  private jetParticleCount: number = 1000
-  private jetPositions!: Float32Array
-  private jetVelocities!: Float32Array
+  // Jets of matter escaping along poles (shader-based)
+  private jetTop!: THREE.Mesh
+  private jetBottom!: THREE.Mesh
+  private jetMaterial!: THREE.ShaderMaterial
+  private jetLength: number = 250.0 // Extend far into space for dramatic reach
 
   // Gravitational lensing ring
   private lensingRing!: THREE.Mesh
@@ -112,48 +111,40 @@ export class BlackHole {
   }
 
   private createJets(): void {
-    // Jets of matter shooting out along poles
-    this.jetsGeometry = new THREE.BufferGeometry()
-    this.jetPositions = new Float32Array(this.jetParticleCount * 3)
-    this.jetVelocities = new Float32Array(this.jetParticleCount * 3)
+    // Create shader-based jet beams (cone geometry for realistic narrowing)
+    // Jet radius proportional to event horizon: ~20% at base, ~50% at tip (physically inspired)
+    const baseRadius = this.blackHoleRadius * 0.20   // 20% of event horizon radius
+    const tipRadius = this.blackHoleRadius * 0.50    // 50% of event horizon radius at tip
+    const radialSegments = 16
+    const heightSegments = 32 // Segments along length for smooth animation
 
-    for (let i = 0; i < this.jetParticleCount; i++) {
-      const i3 = i * 3
-
-      // Start at poles (top and bottom)
-      const isTopJet = Math.random() > 0.5
-      const poleY = isTopJet ? this.blackHoleRadius : -this.blackHoleRadius
-      const offsetX = (Math.random() - 0.5) * 0.5
-      const offsetZ = (Math.random() - 0.5) * 0.5
-
-      this.jetPositions[i3] = offsetX
-      this.jetPositions[i3 + 1] = poleY
-      this.jetPositions[i3 + 2] = offsetZ
-
-      // Velocity shooting outward from poles
-      const jetSpeed = 0.3 + Math.random() * 0.2
-      this.jetVelocities[i3] = offsetX * 0.1 // Slight spread
-      this.jetVelocities[i3 + 1] = (isTopJet ? 1 : -1) * jetSpeed
-      this.jetVelocities[i3 + 2] = offsetZ * 0.1 // Slight spread
-    }
-
-    this.jetsGeometry.setAttribute(
-      'position',
-      new THREE.BufferAttribute(this.jetPositions, 3)
+    // Create cone geometry
+    const geometry = new THREE.CylinderGeometry(
+      baseRadius,      // radiusTop
+      tipRadius,       // radiusBottom (wider at tip)
+      this.jetLength,  // height
+      radialSegments,
+      heightSegments
     )
 
-    // Jets material - bright blue-white
-    this.jetsMaterial = new THREE.PointsMaterial({
-      size: 0.4,
-      color: 0x88ccff,
-      transparent: true,
-      opacity: 0.0, // Start invisible
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
+    // Create shader material
+    this.jetMaterial = createJetTrailMaterial(this.jetLength)
+    this.jetMaterial.uniforms.opacity.value = 0.0 // Start invisible (fade in during formation)
 
-    this.jets = new THREE.Points(this.jetsGeometry, this.jetsMaterial)
-    this.scene.add(this.jets)
+    // Top jet (pointing up along +Y axis)
+    this.jetTop = new THREE.Mesh(geometry.clone(), this.jetMaterial)
+    this.jetTop.position.set(0, this.blackHoleRadius + this.jetLength / 2, 0)
+    this.jetTop.renderOrder = 4 // Render after accretion disk and streams
+    this.scene.add(this.jetTop)
+
+    // Bottom jet (pointing down along -Y axis)
+    this.jetBottom = new THREE.Mesh(geometry.clone(), this.jetMaterial.clone())
+    this.jetBottom.position.set(0, -this.blackHoleRadius - this.jetLength / 2, 0)
+    this.jetBottom.rotation.x = Math.PI // Flip upside down
+    this.jetBottom.renderOrder = 4
+    this.scene.add(this.jetBottom)
+
+    console.log(`Jets created: length=${this.jetLength}, base radius=${baseRadius}`)
   }
 
   public update(deltaTime: number): void {
@@ -185,32 +176,16 @@ export class BlackHole {
 
       // Fade in accretion disk via shader uniform
       this.accretionDiskMaterial.uniforms.globalOpacity.value = this.formationProgress * 1.0
-      this.jetsMaterial.opacity = this.formationProgress * 0.7
+
+      // Fade in jets via shader uniform
+      this.jetMaterial.uniforms.opacity.value = this.formationProgress * 0.8
+      ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = this.formationProgress * 0.8
     }
 
-    // Update jets
-    const jetPositions = this.jetsGeometry.attributes.position.array as Float32Array
-
-    for (let i = 0; i < this.jetParticleCount; i++) {
-      const i3 = i * 3
-
-      // Move particles along velocity
-      jetPositions[i3] += this.jetVelocities[i3]
-      jetPositions[i3 + 1] += this.jetVelocities[i3 + 1]
-      jetPositions[i3 + 2] += this.jetVelocities[i3 + 2]
-
-      // Reset if too far
-      const distanceY = Math.abs(jetPositions[i3 + 1])
-      if (distanceY > 50) {
-        const isTopJet = jetPositions[i3 + 1] > 0
-        const poleY = isTopJet ? this.blackHoleRadius : -this.blackHoleRadius
-        jetPositions[i3] = (Math.random() - 0.5) * 0.5
-        jetPositions[i3 + 1] = poleY
-        jetPositions[i3 + 2] = (Math.random() - 0.5) * 0.5
-      }
-    }
-
-    this.jetsGeometry.attributes.position.needsUpdate = true
+    // Update jet shaders
+    this.jetMaterial.uniforms.time.value = this.time
+    // Bottom jet uses cloned material, update it too
+    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.time.value = this.time
 
     // Pulse lensing ring
     const lensingMaterial = this.lensingRing.material as THREE.MeshBasicMaterial
@@ -238,6 +213,25 @@ export class BlackHole {
     this.eventHorizonMaterial.uniforms.schwarzschildRadius.value = clampedRadius
     this.blackHoleRadius = clampedRadius
 
+    // Scale jets proportionally to event horizon radius (maintains consistent ratio)
+    const radiusRatio = clampedRadius / this.baseRadius
+
+    // Scale jet width/depth to match event horizon growth
+    this.jetTop.scale.x = radiusRatio
+    this.jetTop.scale.z = radiusRatio
+    this.jetTop.scale.y = 1.0 // Keep length constant
+
+    this.jetBottom.scale.x = radiusRatio
+    this.jetBottom.scale.z = radiusRatio
+    this.jetBottom.scale.y = 1.0 // Keep length constant
+
+    // Increase jet brightness with mass (more energetic accretion = brighter jets)
+    // Scale from 2.0 to 4.5 intensity as mass goes from 1.0 to 3.0
+    const massScale = Math.min(this.currentMass, 3.0)
+    const glowScale = 2.0 + (massScale - 1.0) * 1.25
+    this.jetMaterial.uniforms.glowIntensity.value = glowScale
+    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.glowIntensity.value = glowScale
+
     // Only log every 0.1 mass increase to reduce console spam
     if (this.currentMass - this.lastLoggedMass >= 0.1) {
       console.log(`Black hole mass: ${this.currentMass.toFixed(2)}, radius: ${clampedRadius.toFixed(2)}`)
@@ -254,14 +248,20 @@ export class BlackHole {
     this.eventHorizonMaterial.dispose()
     this.accretionDisk.geometry.dispose()
     this.accretionDiskMaterial.dispose()
-    this.jetsGeometry.dispose()
-    this.jetsMaterial.dispose()
+
+    // Dispose shader-based jets
+    this.jetTop.geometry.dispose()
+    this.jetMaterial.dispose()
+    this.jetBottom.geometry.dispose()
+    ;(this.jetBottom.material as THREE.Material).dispose()
+
     this.lensingRing.geometry.dispose()
-      ; (this.lensingRing.material as THREE.Material).dispose()
+    ;(this.lensingRing.material as THREE.Material).dispose()
 
     this.scene.remove(this.eventHorizon)
     this.scene.remove(this.accretionDisk)
-    this.scene.remove(this.jets)
+    this.scene.remove(this.jetTop)
+    this.scene.remove(this.jetBottom)
     this.scene.remove(this.lensingRing)
   }
 }
