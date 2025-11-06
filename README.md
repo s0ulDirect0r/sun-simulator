@@ -1,4 +1,4 @@
-# ☀️ Stellar Evolution Simulator
+# ☀️ Sun Simulator
 
 An interactive, real-time 3D visualization of the complete lifecycle of a massive star, from nebula to black hole. Built with Three.js and TypeScript.
 
