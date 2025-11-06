@@ -99,29 +99,6 @@ body {
   transform: translateY(0);
 }
 
-.phase-btn {
-  flex: 0 0 calc(50% - 4px);
-  padding: 8px 12px;
-  background: rgba(102, 126, 234, 0.2);
-  border: 1px solid rgba(102, 126, 234, 0.4);
-  border-radius: 6px;
-  color: #aaf;
-  font-size: 11px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  font-family: inherit;
-}
-
-.phase-btn:hover {
-  background: rgba(102, 126, 234, 0.4);
-  border-color: rgba(102, 126, 234, 0.6);
-  transform: translateY(-1px);
-}
-
-.phase-btn:active {
-  transform: translateY(0);
-}
-
 #speed-control {
   -webkit-appearance: none;
   appearance: none;

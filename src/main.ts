@@ -236,15 +236,6 @@ class SunSimulator {
       })
     }
 
-    // Phase skip buttons
-    const phaseButtons = document.querySelectorAll('.phase-btn')
-    phaseButtons.forEach((btn) => {
-      btn.addEventListener('click', () => {
-        const phase = parseInt(btn.getAttribute('data-phase') || '0')
-        this.jumpToPhase(phase)
-      })
-    })
-
     // Fullscreen button
     const fullscreenBtn = document.getElementById('btn-fullscreen')
     if (fullscreenBtn) {
@@ -277,112 +268,8 @@ class SunSimulator {
             document.exitFullscreen()
           }
           break
-        case '1':
-          this.jumpToPhase(0)
-          break
-        case '2':
-          this.jumpToPhase(1)
-          break
-        case '3':
-          this.jumpToPhase(2)
-          break
-        case '4':
-          this.jumpToPhase(3)
-          break
-        case '5':
-          this.jumpToPhase(4)
-          break
       }
     })
-  }
-
-  private jumpToPhase(phase: number): void {
-    // Clean up current state
-    if (this.nebula) {
-      this.nebula.dispose()
-      this.nebula = null
-    }
-    if (this.star) {
-      this.star.dispose()
-      this.star = null
-    }
-    if (this.planetSystem) {
-      this.planetSystem.dispose()
-      this.planetSystem = null
-    }
-    if (this.blackHole) {
-      this.blackHole.dispose()
-      this.blackHole = null
-    }
-    if (this.supernovaRemnant) {
-      this.supernovaRemnant.dispose()
-      this.supernovaRemnant = null
-    }
-
-    // Reset timers
-    this.mainSequenceTimer = 0
-    this.redGiantTimer = 0
-    this.supernovaTimer = 0
-
-    // Jump to requested phase
-    switch (phase) {
-      case 0: // Nebula
-        this.nebula = new Nebula(this.scene)
-        this.currentPhase = SimulationPhase.NEBULA_COLLAPSE
-        this.updatePhaseInfo(
-          'Phase 1: Nebula Collapse',
-          'A vast cloud of gas and dust collapses under gravity. Matter spirals inward, heating up as a protostar begins to form.'
-        )
-        break
-      case 1: // Main Sequence
-        this.star = new Star(this.scene, 4.0)
-        this.planetSystem = new PlanetSystem(this.scene)
-        this.planetSystem.show()
-        this.currentPhase = SimulationPhase.MAIN_SEQUENCE
-        this.updatePhaseInfo(
-          'Phase 2: Main Sequence Star',
-          'Fusion ignited! The star enters its stable life phase, burning hydrogen into helium for billions of years. Planets form in orbit.'
-        )
-        break
-      case 2: // Red Giant
-        this.star = new Star(this.scene, 4.0)
-        this.planetSystem = new PlanetSystem(this.scene)
-        this.planetSystem.show()
-        this.star.startRedGiantExpansion()
-        this.currentPhase = SimulationPhase.RED_GIANT
-        this.updatePhaseInfo(
-          'Phase 3: Red Giant Expansion',
-          'Hydrogen depleted. The star swells to enormous size as it fuses helium in its core. Planets are engulfed.'
-        )
-        break
-      case 3: // Supernova
-        this.star = new Star(this.scene, 25.0)
-        this.star['isRedGiant'] = true
-        this.star['currentRadius'] = 25.0
-        this.star.startSupernova()
-        this.supernovaRemnant = new SupernovaRemnant(this.scene, 25.0)
-        this.currentPhase = SimulationPhase.SUPERNOVA
-        this.updatePhaseInfo(
-          'Phase 4: SUPERNOVA!',
-          'Catastrophic core collapse! The star explodes with the energy of billions of suns, scattering heavy elements across the cosmos.'
-        )
-        break
-      case 4: // Black Hole
-        this.blackHole = new BlackHole(this.scene)
-        this.supernovaRemnant = new SupernovaRemnant(this.scene, 25.0)
-        this.currentPhase = SimulationPhase.BLACK_HOLE
-        this.updatePhaseInfo(
-          'Phase 5: Black Hole',
-          'The core collapses into a singularity. Matter spirals into the accretion disk, warping spacetime itself. Nothing escapes.'
-        )
-        break
-    }
-
-    // Clear debug info
-    this.lastDebugText = ''
-    if (this.debugRadiusElement) {
-      this.debugRadiusElement.textContent = ''
-    }
   }
 
   private animate(): void {

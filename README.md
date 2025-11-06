@@ -28,7 +28,6 @@ An interactive, real-time 3D visualization of the complete lifecycle of a massiv
 ### Interactive Controls
 - **Play/Pause** - Space bar or button
 - **Speed Control** - 0.1x to 5.0x simulation speed
-- **Phase Jumping** - Skip directly to any phase (1-5 keys)
 - **Reset** - R key or button
 - **Fullscreen** - F key or button
 - **Camera Controls** - Mouse drag to rotate, scroll to zoom
@@ -56,11 +55,9 @@ npm run build
 - **Space** - Play/Pause
 - **R** - Reset simulation
 - **F** - Toggle fullscreen
-- **1-5** - Jump to phase (1=Nebula, 2=Star, 3=Red Giant, 4=Supernova, 5=Black Hole)
 
 ### UI Buttons
 - Speed slider for fine-tuned control
-- Individual phase buttons for easy navigation
 - Real-time phase descriptions
 
 ## 🎨 Technical Highlights
