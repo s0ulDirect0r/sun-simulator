@@ -6,7 +6,7 @@ import * as THREE from 'three'
  */
 export class AccretionSource {
   private scene: THREE.Scene
-  private particles: THREE.Points
+  public particles: THREE.Points // Public for debug toggles
   private geometry: THREE.BufferGeometry
   private material: THREE.PointsMaterial
   private particleCount: number = 1000 // Increased for visibility
@@ -219,6 +219,17 @@ export class AccretionSource {
 
   public updateEventHorizonRadius(newRadius: number): void {
     this.eventHorizonRadius = newRadius
+  }
+
+  public getActiveParticleCount(): number {
+    // Count particles with lifetime > 0
+    let count = 0
+    for (let i = 0; i < this.particleCount; i++) {
+      if (this.lifetimes[i] > 0) {
+        count++
+      }
+    }
+    return count
   }
 
   public dispose(): void {

@@ -46,6 +46,48 @@
           <strong>Keys:</strong> Space = pause • R = reset • F = fullscreen
         </div>
       </div>
+
+      <!-- Debug Overlay -->
+      <div id="debug-overlay" style="display: none; position: fixed; top: 10px; right: 10px; background: rgba(0,0,0,0.8); color: #0f0; padding: 15px; border: 1px solid #0f0; font-family: 'Courier New', monospace; font-size: 11px; min-width: 250px; z-index: 1000;">
+        <div style="margin-bottom: 10px; font-size: 13px; font-weight: bold; color: #0ff;">DEBUG MODE</div>
+
+        <div style="margin-bottom: 8px;">
+          <div style="color: #888;">--- STATS ---</div>
+          <div>FPS: <span id="debug-fps">--</span></div>
+          <div>Phase: <span id="debug-phase">--</span></div>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+          <div style="color: #888;">--- BLACK HOLE ---</div>
+          <div>Mass: <span id="debug-mass">--</span></div>
+          <div>Radius: <span id="debug-bh-radius">--</span></div>
+        </div>
+
+        <div style="margin-bottom: 8px;">
+          <div style="color: #888;">--- PARTICLES ---</div>
+          <div>Sources: <span id="debug-source-particles">--</span></div>
+          <div>Remnant: <span id="debug-remnant-particles">--</span></div>
+          <div>Total: <span id="debug-total-particles">--</span></div>
+        </div>
+
+        <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #0f0;">
+          <div style="color: #888;">--- TOGGLES ---</div>
+          <div style="font-size: 10px; line-height: 1.4;">
+            D = This overlay<br>
+            1 = Accretion disk<br>
+            2 = Jets<br>
+            3 = Event horizon<br>
+            4 = Lensing ring<br>
+            5 = Accretion sources<br>
+            6 = Supernova remnant<br>
+            L = Lights<br>
+            B = Bloom<br>
+            G = Film grain<br>
+            V = Vignette<br>
+            A = Toggle all
+          </div>
+        </div>
+      </div>
     </div>
     <script type="module" src="/src/main.ts"></script>
   </body>
