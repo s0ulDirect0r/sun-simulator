@@ -528,6 +528,10 @@ export class Star {
     return this.isSupernova
   }
 
+  public getCameraShakeIntensity(): number {
+    return this.supernovaFlash ? this.supernovaFlash.getShakeIntensity() : 0
+  }
+
   public dispose(): void {
     this.star.geometry.dispose()
     ;(this.star.material as THREE.Material).dispose()
