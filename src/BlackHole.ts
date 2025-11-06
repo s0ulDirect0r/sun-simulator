@@ -17,14 +17,6 @@ export class BlackHole {
   private jetMaterial!: THREE.ShaderMaterial
   private jetLength: number = 250.0 // Extend far into space for dramatic reach
 
-  // OLD particle jets (commented out for now)
-  // private jets!: THREE.Points
-  // private jetsGeometry!: THREE.BufferGeometry
-  // private jetsMaterial!: THREE.PointsMaterial
-  // private jetParticleCount: number = 1000
-  // private jetPositions!: Float32Array
-  // private jetVelocities!: Float32Array
-
   // Gravitational lensing ring
   private lensingRing!: THREE.Mesh
 
