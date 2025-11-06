@@ -1,6 +1,9 @@
 import './style.css'
 import * as THREE from 'three'
 import { OrbitControls } from 'three/examples/jsm/controls/OrbitControls.js'
+import { EffectComposer } from 'three/examples/jsm/postprocessing/EffectComposer.js'
+import { RenderPass } from 'three/examples/jsm/postprocessing/RenderPass.js'
+import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPass.js'
 import { Nebula } from './Nebula'
 import { Star } from './Star'
 import { IgnitionBurst } from './IgnitionBurst'
@@ -16,6 +19,8 @@ class SunSimulator {
   private scene: THREE.Scene
   private camera: THREE.PerspectiveCamera
   private renderer: THREE.WebGLRenderer
+  private composer: EffectComposer
+  private bloomPass: UnrealBloomPass
   private controls: OrbitControls
   private canvas: HTMLCanvasElement
   private nebula: Nebula | null = null
@@ -31,6 +36,9 @@ class SunSimulator {
   private lastDebugText = ''
   private mainSequenceTimer: number = 0
   private mainSequenceDuration: number = 30.0 // 30 seconds in main sequence before red giant
+  private redGiantTimer: number = 0
+  private redGiantDuration: number = 15.0 // 15 seconds in red giant before supernova
+  private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
 
   constructor() {
     // Get canvas element
@@ -62,6 +70,22 @@ class SunSimulator {
     })
     this.renderer.setSize(window.innerWidth, window.innerHeight)
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2))
+
+    // Set up post-processing with bloom
+    this.composer = new EffectComposer(this.renderer)
+
+    // Add render pass (renders the scene)
+    const renderPass = new RenderPass(this.scene, this.camera)
+    this.composer.addPass(renderPass)
+
+    // Add bloom pass (makes bright things GLOW)
+    this.bloomPass = new UnrealBloomPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      0.8, // Base bloom strength (will be dynamic during supernova)
+      0.4, // Bloom radius
+      0.85 // Bloom threshold (only bright things bloom)
+    )
+    this.composer.addPass(this.bloomPass)
 
     // Initialize orbit controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -107,6 +131,9 @@ class SunSimulator {
 
     // Update renderer size
     this.renderer.setSize(window.innerWidth, window.innerHeight)
+
+    // Update composer size
+    this.composer.setSize(window.innerWidth, window.innerHeight)
   }
 
   private updatePhaseInfo(phase: string): void {
@@ -152,6 +179,21 @@ class SunSimulator {
     // Update controls
     this.controls.update()
 
+    // Apply camera shake during supernova
+    if (this.star) {
+      const shakeIntensity = this.star.getCameraShakeIntensity()
+      if (shakeIntensity > 0) {
+        // Apply shake offset
+        const shakeAmount = 0.5 * shakeIntensity // Max shake of 0.5 units
+        this.camera.position.x = this.cameraBasePosition.x + (Math.random() - 0.5) * shakeAmount
+        this.camera.position.y = this.cameraBasePosition.y + (Math.random() - 0.5) * shakeAmount
+        this.camera.position.z = this.cameraBasePosition.z + (Math.random() - 0.5) * shakeAmount * 0.3
+      } else {
+        // Reset to base position when no shake
+        this.camera.position.copy(this.cameraBasePosition)
+      }
+    }
+
     // Update current phase
     this.updatePhaseLogic(deltaTime)
     if (this.ignitionBurst) {
@@ -161,8 +203,15 @@ class SunSimulator {
       }
     }
 
-    // Render scene
-    this.renderer.render(this.scene, this.camera)
+    // Dynamic bloom intensity based on supernova flash
+    if (this.star) {
+      const shakeIntensity = this.star.getCameraShakeIntensity()
+      // Bloom gets INSANE during supernova (0.8 base → 3.5 peak)
+      this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 3.5, shakeIntensity)
+    }
+
+    // Render scene with post-processing
+    this.composer.render()
   }
 
   private updatePhaseLogic(deltaTime: number): void {
@@ -197,11 +246,19 @@ class SunSimulator {
       case SimulationPhase.RED_GIANT:
         if (this.star) {
           this.star.update(deltaTime)
+
+          // Track red giant duration and trigger supernova
+          this.redGiantTimer += deltaTime
+          if (this.redGiantTimer >= this.redGiantDuration && !this.star.isInSupernovaPhase()) {
+            this.startSupernova()
+          }
         }
         break
 
       case SimulationPhase.SUPERNOVA:
-        // TODO: Phase 4 implementation
+        if (this.star) {
+          this.star.update(deltaTime)
+        }
         break
     }
   }
@@ -220,6 +277,22 @@ class SunSimulator {
       this.debugRadiusElement.textContent = ''
     }
     this.updatePhaseInfo('Phase 3: Red Giant Expansion')
+  }
+
+  private startSupernova(): void {
+    console.log('Starting supernova explosion...')
+
+    if (this.star) {
+      this.star.startSupernova()
+    }
+
+    // Update phase
+    this.currentPhase = SimulationPhase.SUPERNOVA
+    this.lastDebugText = ''
+    if (this.debugRadiusElement) {
+      this.debugRadiusElement.textContent = ''
+    }
+    this.updatePhaseInfo('Phase 4: SUPERNOVA!')
   }
 
   private startTransitionToMainSequence(): void {
