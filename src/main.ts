@@ -10,6 +10,9 @@ import { IgnitionBurst } from './IgnitionBurst'
 import { PlanetSystem } from './PlanetSystem'
 import { BlackHole } from './BlackHole'
 import { SupernovaRemnant } from './SupernovaRemnant'
+import { FilmGrainPass } from './FilmGrainPass'
+import { VignettePass } from './VignettePass'
+import { Starfield } from './Starfield'
 
 enum SimulationPhase {
   NEBULA_COLLAPSE = 'NEBULA_COLLAPSE',
@@ -33,6 +36,7 @@ class SunSimulator {
   private planetSystem: PlanetSystem | null = null
   private blackHole: BlackHole | null = null
   private supernovaRemnant: SupernovaRemnant | null = null
+  private starfield: Starfield | null = null
   private clock: THREE.Clock
   private currentPhase: SimulationPhase = SimulationPhase.NEBULA_COLLAPSE
   private transitionProgress: number = 0
@@ -98,6 +102,14 @@ class SunSimulator {
     )
     this.composer.addPass(this.bloomPass)
 
+    // Add cinematic effects
+    const filmGrainPass = new FilmGrainPass()
+    this.composer.addPass(filmGrainPass)
+
+    const vignettePass = new VignettePass(0.4)
+    vignettePass.renderToScreen = true
+    this.composer.addPass(vignettePass)
+
     // Initialize orbit controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
@@ -110,6 +122,9 @@ class SunSimulator {
 
     // Initialize clock for delta time
     this.clock = new THREE.Clock()
+
+    // Create starfield background
+    this.starfield = new Starfield(this.scene)
 
     // Create nebula
     this.nebula = new Nebula(this.scene)
@@ -398,6 +413,11 @@ class SunSimulator {
   }
 
   private updatePhaseLogic(deltaTime: number): void {
+    // Update starfield
+    if (this.starfield) {
+      this.starfield.update(deltaTime)
+    }
+
     // Update planet system if it exists
     if (this.planetSystem) {
       const currentStarRadius = this.star ? this.star['currentRadius'] || 4.0 : 4.0
