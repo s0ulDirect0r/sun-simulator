@@ -10,6 +10,7 @@ import { IgnitionBurst } from './IgnitionBurst'
 import { PlanetSystem } from './PlanetSystem'
 import { BlackHole } from './BlackHole'
 import { SupernovaRemnant } from './SupernovaRemnant'
+import { AccretionSource } from './AccretionSource'
 import { FilmGrainPass } from './FilmGrainPass'
 import { VignettePass } from './VignettePass'
 import { Starfield } from './Starfield'
@@ -36,6 +37,7 @@ class SunSimulator {
   private planetSystem: PlanetSystem | null = null
   private blackHole: BlackHole | null = null
   private supernovaRemnant: SupernovaRemnant | null = null
+  private accretionSources: AccretionSource[] = []
   private starfield: Starfield | null = null
   private clock: THREE.Clock
   private currentPhase: SimulationPhase = SimulationPhase.NEBULA_COLLAPSE
@@ -396,6 +398,12 @@ class SunSimulator {
         if (this.blackHole) {
           this.blackHole.update(deltaTime)
         }
+        // Continue updating supernova remnant for accretion effect
+        if (this.supernovaRemnant) {
+          this.supernovaRemnant.update(deltaTime)
+        }
+        // Update accretion sources (sporadic chunk spawners)
+        this.accretionSources.forEach((source) => source.update(deltaTime))
         break
     }
   }
@@ -460,11 +468,60 @@ class SunSimulator {
       this.star = null
     }
 
-    // Remove supernova remnant
-    if (this.supernovaRemnant) {
-      this.supernovaRemnant.dispose()
-      this.supernovaRemnant = null
+    // Keep supernova remnant alive for accretion - particles will be pulled into black hole
+    // Enable accretion mode with gravitational attraction
+    if (this.supernovaRemnant && this.blackHole) {
+      this.supernovaRemnant.enableAccretion(
+        new THREE.Vector3(0, 0, 0),  // Black hole at origin
+        0.15,                         // Accretion strength (3x stronger)
+        this.blackHole.getEventHorizonRadius()  // Match actual event horizon size
+      )
+
+      // Set up particle consumption callback
+      this.supernovaRemnant.setConsumptionCallback((mass) => {
+        if (this.blackHole) {
+          this.blackHole.addMass(mass)
+
+          // Update remnant with new event horizon radius
+          const newRadius = this.blackHole.getEventHorizonRadius()
+          if (this.supernovaRemnant) {
+            this.supernovaRemnant.updateEventHorizonRadius(newRadius)
+          }
+        }
+      })
     }
+
+    // Create accretion sources at various orbital positions (2x distance for longer spiral)
+    const sourcePositions = [
+      new THREE.Vector3(50, 30, 20),   // ~62 units from black hole
+      new THREE.Vector3(-44, -20, 36), // ~62 units from black hole
+      new THREE.Vector3(36, -40, -30), // ~62 units from black hole
+    ]
+
+    sourcePositions.forEach((pos) => {
+      const source = new AccretionSource(
+        this.scene,
+        pos,
+        0xff5500,  // Hot orange (accreting stellar matter)
+        0.15,      // Stronger gravitational pull (3x)
+        this.blackHole!.getEventHorizonRadius()  // Match actual event horizon size
+      )
+
+      // Wire up consumption callback to grow black hole
+      if (this.blackHole) {
+        source.setConsumptionCallback((mass) => {
+          if (this.blackHole) {
+            this.blackHole.addMass(mass)
+
+            // Update all sources with new event horizon radius
+            const newRadius = this.blackHole.getEventHorizonRadius()
+            this.accretionSources.forEach(s => s.updateEventHorizonRadius(newRadius))
+          }
+        })
+      }
+
+      this.accretionSources.push(source)
+    })
 
     // Remove planets
     if (this.planetSystem) {

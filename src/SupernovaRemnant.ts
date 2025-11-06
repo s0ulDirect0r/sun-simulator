@@ -13,6 +13,16 @@ export class SupernovaRemnant {
   // Multiple shell layers for depth
   private shellCount: number = 3
 
+  // Accretion mode properties
+  private isBeingAccreted: boolean = false
+  private blackHolePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 0)
+  private accretionStrength: number = 0
+  private eventHorizonRadius: number = 5.0
+
+  // Particle consumption tracking
+  private consumedParticles: Set<number> = new Set()
+  private onParticleConsumed?: (mass: number) => void
+
   constructor(scene: THREE.Scene, initialRadius: number = 25) {
     this.scene = scene
 
@@ -123,6 +133,80 @@ export class SupernovaRemnant {
         positions[i3] += (Math.random() - 0.5) * 0.05
         positions[i3 + 1] += (Math.random() - 0.5) * 0.05
         positions[i3 + 2] += (Math.random() - 0.5) * 0.05
+
+        // Apply gravitational attraction if accretion mode is enabled
+        if (this.isBeingAccreted) {
+          // Calculate vector to black hole
+          const dx = this.blackHolePosition.x - positions[i3]
+          const dy = this.blackHolePosition.y - positions[i3 + 1]
+          const dz = this.blackHolePosition.z - positions[i3 + 2]
+          const distanceSquared = dx * dx + dy * dy + dz * dz
+          const distance = Math.sqrt(distanceSquared)
+
+          // Check if particle reached event horizon (consumed by black hole)
+          const particleIndex = shellIndex * this.particleCount + i
+          if (distance < this.eventHorizonRadius && !this.consumedParticles.has(particleIndex)) {
+            this.consumedParticles.add(particleIndex)
+
+            // Notify black hole of mass consumption
+            if (this.onParticleConsumed) {
+              this.onParticleConsumed(0.0001) // Each particle = 0.0001 mass units
+            }
+
+            // Make particle invisible (move far away)
+            positions[i3] = 10000
+            positions[i3 + 1] = 10000
+            positions[i3 + 2] = 10000
+
+            // Zero out velocity
+            velocities[i3] = 0
+            velocities[i3 + 1] = 0
+            velocities[i3 + 2] = 0
+          }
+
+          // Only apply gravity within accretion radius and if not consumed
+          if (distance < 100 && distance > 0.1 && !this.consumedParticles.has(particleIndex)) {
+            // Gravitational acceleration (simplified inverse-square law)
+            const acceleration = this.accretionStrength / distanceSquared
+
+            // Normalize radial direction
+            const radialX = dx / distance
+            const radialY = dy / distance
+            const radialZ = dz / distance
+
+            // Apply radial force (toward black hole)
+            const ax = radialX * acceleration
+            const ay = radialY * acceleration
+            const az = radialZ * acceleration
+
+            velocities[i3] += ax
+            velocities[i3 + 1] += ay
+            velocities[i3 + 2] += az
+
+            // Add tangential velocity for spiral motion (angular momentum)
+            // Cross product: tangent = radial × up(0,1,0)
+            const tangentX = radialY * 0 - radialZ * 1  // = -radialZ
+            const tangentY = radialZ * 0 - radialX * 0  // = 0
+            const tangentZ = radialX * 1 - radialY * 0  // = radialX
+
+            // Normalize tangent vector
+            const tangentLength = Math.sqrt(tangentX * tangentX + tangentY * tangentY + tangentZ * tangentZ)
+
+            if (tangentLength > 0.001) {
+              const txNorm = tangentX / tangentLength
+              const tyNorm = tangentY / tangentLength
+              const tzNorm = tangentZ / tangentLength
+
+              // Orbital velocity (Keplerian: v ∝ sqrt(1/r))
+              // Scale by 0.5 for balance between spiral and infall
+              const orbitalSpeed = Math.sqrt(this.accretionStrength / distance) * 0.5
+
+              velocities[i3] += txNorm * orbitalSpeed
+              velocities[i3 + 1] += tyNorm * orbitalSpeed
+              velocities[i3 + 2] += tzNorm * orbitalSpeed
+            }
+          }
+        }
       }
 
       geometry.attributes.position.needsUpdate = true
@@ -138,6 +222,22 @@ export class SupernovaRemnant {
       shell.rotation.y += deltaTime * 0.05
       shell.rotation.x += deltaTime * 0.02
     })
+  }
+
+  public enableAccretion(blackHolePosition: THREE.Vector3, strength: number, horizonRadius: number): void {
+    this.isBeingAccreted = true
+    this.blackHolePosition.copy(blackHolePosition)
+    this.accretionStrength = strength
+    this.eventHorizonRadius = horizonRadius
+    console.log(`Accretion enabled: strength=${strength}, horizon radius=${horizonRadius}`)
+  }
+
+  public setConsumptionCallback(callback: (mass: number) => void): void {
+    this.onParticleConsumed = callback
+  }
+
+  public updateEventHorizonRadius(newRadius: number): void {
+    this.eventHorizonRadius = newRadius
   }
 
   public dispose(): void {
