@@ -133,7 +133,10 @@ class SunSimulator {
     window.addEventListener('resize', this.onWindowResize.bind(this))
 
     // Update phase info
-    this.updatePhaseInfo('Phase 1: Nebula Collapse')
+    this.updatePhaseInfo(
+      'Phase 1: Nebula Collapse',
+      'A vast cloud of gas and dust collapses under gravity. Matter spirals inward, heating up as a protostar begins to form.'
+    )
 
     // Set up interactive controls
     this.setupControls()
@@ -165,7 +168,7 @@ class SunSimulator {
     this.composer.setSize(window.innerWidth, window.innerHeight)
   }
 
-  private updatePhaseInfo(phase: string): void {
+  private updatePhaseInfo(phase: string, description?: string): void {
     if (phase === this.lastPhaseText) {
       return
     }
@@ -174,6 +177,12 @@ class SunSimulator {
 
     if (this.phaseElement) {
       this.phaseElement.textContent = phase
+    }
+
+    // Update phase description
+    const descElement = document.getElementById('phase-description')
+    if (descElement && description) {
+      descElement.textContent = description
     }
   }
 
@@ -320,14 +329,20 @@ class SunSimulator {
       case 0: // Nebula
         this.nebula = new Nebula(this.scene)
         this.currentPhase = SimulationPhase.NEBULA_COLLAPSE
-        this.updatePhaseInfo('Phase 1: Nebula Collapse')
+        this.updatePhaseInfo(
+          'Phase 1: Nebula Collapse',
+          'A vast cloud of gas and dust collapses under gravity. Matter spirals inward, heating up as a protostar begins to form.'
+        )
         break
       case 1: // Main Sequence
         this.star = new Star(this.scene, 4.0)
         this.planetSystem = new PlanetSystem(this.scene)
         this.planetSystem.show()
         this.currentPhase = SimulationPhase.MAIN_SEQUENCE
-        this.updatePhaseInfo('Phase 2: Main Sequence Star')
+        this.updatePhaseInfo(
+          'Phase 2: Main Sequence Star',
+          'Fusion ignited! The star enters its stable life phase, burning hydrogen into helium for billions of years. Planets form in orbit.'
+        )
         break
       case 2: // Red Giant
         this.star = new Star(this.scene, 4.0)
@@ -335,7 +350,10 @@ class SunSimulator {
         this.planetSystem.show()
         this.star.startRedGiantExpansion()
         this.currentPhase = SimulationPhase.RED_GIANT
-        this.updatePhaseInfo('Phase 3: Red Giant Expansion')
+        this.updatePhaseInfo(
+          'Phase 3: Red Giant Expansion',
+          'Hydrogen depleted. The star swells to enormous size as it fuses helium in its core. Planets are engulfed.'
+        )
         break
       case 3: // Supernova
         this.star = new Star(this.scene, 25.0)
@@ -344,13 +362,19 @@ class SunSimulator {
         this.star.startSupernova()
         this.supernovaRemnant = new SupernovaRemnant(this.scene, 25.0)
         this.currentPhase = SimulationPhase.SUPERNOVA
-        this.updatePhaseInfo('Phase 4: SUPERNOVA!')
+        this.updatePhaseInfo(
+          'Phase 4: SUPERNOVA!',
+          'Catastrophic core collapse! The star explodes with the energy of billions of suns, scattering heavy elements across the cosmos.'
+        )
         break
       case 4: // Black Hole
         this.blackHole = new BlackHole(this.scene)
         this.supernovaRemnant = new SupernovaRemnant(this.scene, 25.0)
         this.currentPhase = SimulationPhase.BLACK_HOLE
-        this.updatePhaseInfo('Phase 5: Black Hole')
+        this.updatePhaseInfo(
+          'Phase 5: Black Hole',
+          'The core collapses into a singularity. Matter spirals into the accretion disk, warping spacetime itself. Nothing escapes.'
+        )
         break
     }
 
@@ -502,7 +526,10 @@ class SunSimulator {
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
     }
-    this.updatePhaseInfo('Phase 3: Red Giant Expansion')
+    this.updatePhaseInfo(
+      'Phase 3: Red Giant Expansion',
+      'Hydrogen depleted. The star swells to enormous size as it fuses helium in its core. Planets are engulfed.'
+    )
   }
 
   private startSupernova(): void {
@@ -528,7 +555,10 @@ class SunSimulator {
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
     }
-    this.updatePhaseInfo('Phase 4: SUPERNOVA!')
+    this.updatePhaseInfo(
+      'Phase 4: SUPERNOVA!',
+      'Catastrophic core collapse! The star explodes with the energy of billions of suns, scattering heavy elements across the cosmos.'
+    )
   }
 
   private startBlackHole(): void {
@@ -555,7 +585,10 @@ class SunSimulator {
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
     }
-    this.updatePhaseInfo('Phase 5: Black Hole')
+    this.updatePhaseInfo(
+      'Phase 5: Black Hole',
+      'The core collapses into a singularity. Matter spirals into the accretion disk, warping spacetime itself. Nothing escapes.'
+    )
   }
 
   private startTransitionToMainSequence(): void {
@@ -627,7 +660,10 @@ class SunSimulator {
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
     }
-    this.updatePhaseInfo('Phase 2: Main Sequence Star')
+    this.updatePhaseInfo(
+      'Phase 2: Main Sequence Star',
+      'Fusion ignited! The star enters its stable life phase, burning hydrogen into helium for billions of years. Planets form in orbit.'
+    )
   }
 }
 
