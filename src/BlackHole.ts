@@ -24,6 +24,11 @@ export class BlackHole {
   private time: number = 0
   private blackHoleRadius: number = 5.0 // Schwarzschild radius (scaled up for visibility)
 
+  // Mass growth tracking
+  private currentMass: number = 1.0 // Initial mass in solar masses
+  private baseRadius: number = 5.0 // Initial Schwarzschild radius
+  private lastLoggedMass: number = 1.0 // For reducing console spam
+
   private formationProgress: number = 0
   private formationDuration: number = 4.0
   private isForming: boolean = true
@@ -215,7 +220,33 @@ export class BlackHole {
 
     // Subtle rotation of event horizon (for effect)
     this.eventHorizon.rotation.y += deltaTime * 0.1
-    console.log(this.eventHorizonMaterial)
+  }
+
+  public addMass(deltaMass: number): void {
+    this.currentMass += deltaMass
+
+    // Schwarzschild radius: Rs = 2GM/c² (simplified: Rs ∝ M)
+    const newRadius = this.baseRadius * this.currentMass
+
+    // Clamp maximum growth to prevent excessive scaling (max 3x initial size)
+    const clampedRadius = Math.min(newRadius, this.baseRadius * 3.0)
+
+    // Scale event horizon sphere
+    this.eventHorizon.scale.setScalar(clampedRadius / this.baseRadius)
+
+    // Update shader uniform for Schwarzschild radius
+    this.eventHorizonMaterial.uniforms.schwarzschildRadius.value = clampedRadius
+    this.blackHoleRadius = clampedRadius
+
+    // Only log every 0.1 mass increase to reduce console spam
+    if (this.currentMass - this.lastLoggedMass >= 0.1) {
+      console.log(`Black hole mass: ${this.currentMass.toFixed(2)}, radius: ${clampedRadius.toFixed(2)}`)
+      this.lastLoggedMass = this.currentMass
+    }
+  }
+
+  public getEventHorizonRadius(): number {
+    return this.blackHoleRadius
   }
 
   public dispose(): void {
