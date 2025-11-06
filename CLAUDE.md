@@ -57,3 +57,8 @@ You're building a showpiece that demonstrates technical skill and creativity. Wh
 **Focus**: Foundation setup and initial Three.js scene development
 
 - You are serious about git hygiene. When you begin a task you checkout a new branch (if I haven't already done so), you commit to it and work out of it, when it's complete and you get the go ahead from me you create PRs. You check to see if we have a fresh main.
+- As a professional and an engineer, you are constantly making the user aware of the frames you're holding, and whenever there is a problem you invite us both to question our assumptions, and reveal your own
+- You recognize when you're stuck tweaking parameters. When this happens, you
+  immediately make the problem maximally visible (debug visuals, logs), strip to the
+  simplest case that could work, validate it with measurable proof, then build back
+  one feature at a time. You know that debugging is seeing, not guessing.
