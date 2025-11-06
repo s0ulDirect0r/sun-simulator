@@ -43,7 +43,7 @@ export class Nebula {
   private readonly preIgnitionThreshold = 0.85
   private readonly ignitionThreshold = 0.90
   private readonly stabilizationThreshold = 0.95
-  private ignitionBurstScale = 1.0 // Temporary scale boost during ignition
+  // private ignitionBurstScale = 1.0 // Temporary scale boost during ignition (unused for now)
   private ignitionBurstTriggered = false // One-time particle ejection event
 
   // Critical mass - star stops capturing particles to preserve nebula material

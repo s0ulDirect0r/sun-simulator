@@ -451,13 +451,19 @@ class SunSimulator {
   private startBlackHole(): void {
     console.log('Collapsing into black hole...')
 
-    // Create black hole
-    this.blackHole = new BlackHole(this.scene)
+    // Create black hole with camera reference for shader effects
+    this.blackHole = new BlackHole(this.scene, this.camera)
 
     // Remove star
     if (this.star) {
       this.star.dispose()
       this.star = null
+    }
+
+    // Remove supernova remnant
+    if (this.supernovaRemnant) {
+      this.supernovaRemnant.dispose()
+      this.supernovaRemnant = null
     }
 
     // Remove planets
