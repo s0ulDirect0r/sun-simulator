@@ -7,12 +7,16 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { Nebula } from './Nebula'
 import { Star } from './Star'
 import { IgnitionBurst } from './IgnitionBurst'
+import { PlanetSystem } from './PlanetSystem'
+import { BlackHole } from './BlackHole'
+import { SupernovaRemnant } from './SupernovaRemnant'
 
 enum SimulationPhase {
   NEBULA_COLLAPSE = 'NEBULA_COLLAPSE',
   MAIN_SEQUENCE = 'MAIN_SEQUENCE',
   RED_GIANT = 'RED_GIANT',
-  SUPERNOVA = 'SUPERNOVA'
+  SUPERNOVA = 'SUPERNOVA',
+  BLACK_HOLE = 'BLACK_HOLE'
 }
 
 class SunSimulator {
@@ -26,6 +30,9 @@ class SunSimulator {
   private nebula: Nebula | null = null
   private star: Star | null = null
   private ignitionBurst: IgnitionBurst | null = null
+  private planetSystem: PlanetSystem | null = null
+  private blackHole: BlackHole | null = null
+  private supernovaRemnant: SupernovaRemnant | null = null
   private clock: THREE.Clock
   private currentPhase: SimulationPhase = SimulationPhase.NEBULA_COLLAPSE
   private transitionProgress: number = 0
@@ -38,6 +45,8 @@ class SunSimulator {
   private mainSequenceDuration: number = 30.0 // 30 seconds in main sequence before red giant
   private redGiantTimer: number = 0
   private redGiantDuration: number = 15.0 // 15 seconds in red giant before supernova
+  private supernovaTimer: number = 0
+  private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
   private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
 
   constructor() {
@@ -215,6 +224,17 @@ class SunSimulator {
   }
 
   private updatePhaseLogic(deltaTime: number): void {
+    // Update planet system if it exists
+    if (this.planetSystem) {
+      const currentStarRadius = this.star ? this.star['currentRadius'] || 4.0 : 4.0
+      this.planetSystem.update(deltaTime, currentStarRadius)
+    }
+
+    // Update supernova remnant if it exists
+    if (this.supernovaRemnant) {
+      this.supernovaRemnant.update(deltaTime)
+    }
+
     switch (this.currentPhase) {
       case SimulationPhase.NEBULA_COLLAPSE:
         if (this.nebula) {
@@ -258,6 +278,18 @@ class SunSimulator {
       case SimulationPhase.SUPERNOVA:
         if (this.star) {
           this.star.update(deltaTime)
+
+          // Track supernova duration and trigger black hole
+          this.supernovaTimer += deltaTime
+          if (this.supernovaTimer >= this.supernovaDuration) {
+            this.startBlackHole()
+          }
+        }
+        break
+
+      case SimulationPhase.BLACK_HOLE:
+        if (this.blackHole) {
+          this.blackHole.update(deltaTime)
         }
         break
     }
@@ -284,15 +316,52 @@ class SunSimulator {
 
     if (this.star) {
       this.star.startSupernova()
+
+      // Create supernova remnant
+      const currentStarRadius = this.star['currentRadius'] || 25.0
+      this.supernovaRemnant = new SupernovaRemnant(this.scene, currentStarRadius)
+    }
+
+    // Hide planets during supernova
+    if (this.planetSystem) {
+      this.planetSystem.hide()
     }
 
     // Update phase
     this.currentPhase = SimulationPhase.SUPERNOVA
+    this.supernovaTimer = 0
     this.lastDebugText = ''
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
     }
     this.updatePhaseInfo('Phase 4: SUPERNOVA!')
+  }
+
+  private startBlackHole(): void {
+    console.log('Collapsing into black hole...')
+
+    // Create black hole
+    this.blackHole = new BlackHole(this.scene)
+
+    // Remove star
+    if (this.star) {
+      this.star.dispose()
+      this.star = null
+    }
+
+    // Remove planets
+    if (this.planetSystem) {
+      this.planetSystem.dispose()
+      this.planetSystem = null
+    }
+
+    // Update phase
+    this.currentPhase = SimulationPhase.BLACK_HOLE
+    this.lastDebugText = ''
+    if (this.debugRadiusElement) {
+      this.debugRadiusElement.textContent = ''
+    }
+    this.updatePhaseInfo('Phase 5: Black Hole')
   }
 
   private startTransitionToMainSequence(): void {
@@ -304,6 +373,10 @@ class SunSimulator {
     // Create star at protostar's current size
     this.star = new Star(this.scene, protostarRadius)
     this.ignitionBurst = new IgnitionBurst(this.scene)
+
+    // Create planet system
+    this.planetSystem = new PlanetSystem(this.scene)
+    this.planetSystem.show()
 
     // Fade out and dispose of nebula over time
     if (this.nebula) {
