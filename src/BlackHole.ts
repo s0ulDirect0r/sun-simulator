@@ -1,15 +1,14 @@
 import * as THREE from 'three'
+import { createEventHorizonMaterial } from './shaders/EventHorizonShader'
+import { createAccretionDiskMaterial } from './shaders/AccretionDiskShader'
 
 export class BlackHole {
   private scene: THREE.Scene
+  // private camera: THREE.Camera // Not needed - Three.js provides cameraPosition automatically
   private eventHorizon!: THREE.Mesh
-  private accretionDisk!: THREE.Points
-  private accretionDiskGeometry!: THREE.BufferGeometry
-  private accretionDiskMaterial!: THREE.PointsMaterial
-  private diskParticleCount: number = 5000
-  private diskPositions!: Float32Array
-  private diskVelocities!: Float32Array
-  private diskColors!: Float32Array
+  private eventHorizonMaterial!: THREE.ShaderMaterial
+  private accretionDisk!: THREE.Mesh
+  private accretionDiskMaterial!: THREE.ShaderMaterial
 
   // Jets of matter escaping along poles
   private jets!: THREE.Points
@@ -23,16 +22,15 @@ export class BlackHole {
   private lensingRing!: THREE.Mesh
 
   private time: number = 0
-  private blackHoleRadius: number = 3.0 // Schwarzschild radius
-  private accretionDiskInnerRadius: number = 4.0
-  private accretionDiskOuterRadius: number = 20.0
+  private blackHoleRadius: number = 5.0 // Schwarzschild radius (scaled up for visibility)
 
   private formationProgress: number = 0
   private formationDuration: number = 4.0
   private isForming: boolean = true
 
-  constructor(scene: THREE.Scene) {
+  constructor(scene: THREE.Scene, _camera: THREE.Camera) {
     this.scene = scene
+    // camera not needed - Three.js provides cameraPosition automatically
 
     this.createEventHorizon()
     this.createAccretionDisk()
@@ -41,16 +39,25 @@ export class BlackHole {
   }
 
   private createEventHorizon(): void {
-    // Event horizon - perfectly black sphere
-    const geometry = new THREE.SphereGeometry(this.blackHoleRadius, 64, 64)
-    const material = new THREE.MeshBasicMaterial({
-      color: 0x000000,
-      transparent: true,
-      opacity: 0.0, // Start invisible
-    })
+    // Event horizon with shader-based spacetime distortion
+    // Using high-resolution sphere for smooth curvature
+    const geometry = new THREE.SphereGeometry(this.blackHoleRadius, 128, 128)
 
-    this.eventHorizon = new THREE.Mesh(geometry, material)
+    // Create shader material with Schwarzschild radius
+    this.eventHorizonMaterial = createEventHorizonMaterial(this.blackHoleRadius)
+
+    // Start at full opacity to test visibility (skip formation fade-in for now)
+    this.eventHorizonMaterial.uniforms.glowIntensity.value = 8.0
+    this.eventHorizonMaterial.opacity = 1.0
+
+    this.eventHorizon = new THREE.Mesh(geometry, this.eventHorizonMaterial)
+
+    // Render after jets but before disk for proper layering
+    this.eventHorizon.renderOrder = 1
+
     this.scene.add(this.eventHorizon)
+
+    console.log(`Event horizon created: radius=${this.blackHoleRadius}`)
   }
 
   private createLensingRing(): void {
@@ -76,78 +83,26 @@ export class BlackHole {
   }
 
   private createAccretionDisk(): void {
-    // Initialize geometry for accretion disk
-    this.accretionDiskGeometry = new THREE.BufferGeometry()
-    this.diskPositions = new Float32Array(this.diskParticleCount * 3)
-    this.diskVelocities = new Float32Array(this.diskParticleCount * 3)
-    this.diskColors = new Float32Array(this.diskParticleCount * 3)
+    // Shader-based accretion disk - sized to be visible from default camera
+    // ISCO at 3× Schwarzschild radius, but scaled up for visibility
+    const innerRadius = this.blackHoleRadius * 2.0  // 6.0 units
+    const outerRadius = this.blackHoleRadius * 12.0  // 36.0 units
 
-    // Create swirling accretion disk particles
-    for (let i = 0; i < this.diskParticleCount; i++) {
-      const i3 = i * 3
+    console.log(`Creating accretion disk: inner=${innerRadius}, outer=${outerRadius}, schwarzschild=${this.blackHoleRadius}`)
 
-      // Particles in a disk formation
-      const radius = this.accretionDiskInnerRadius +
-        Math.pow(Math.random(), 0.5) * (this.accretionDiskOuterRadius - this.accretionDiskInnerRadius)
-      const angle = Math.random() * Math.PI * 2
-      const height = (Math.random() - 0.5) * 0.5 * (1 - radius / this.accretionDiskOuterRadius) // Thinner at outer edge
+    // Create ring geometry for the disk
+    const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 128, 32)
 
-      this.diskPositions[i3] = Math.cos(angle) * radius
-      this.diskPositions[i3 + 1] = height
-      this.diskPositions[i3 + 2] = Math.sin(angle) * radius
+    // Rotate to horizontal (default ring is vertical)
+    geometry.rotateX(-Math.PI / 2)
 
-      // Orbital velocity (faster closer to black hole)
-      const speed = 0.05 / Math.sqrt(radius) // Keplerian velocity
-      this.diskVelocities[i3] = -Math.sin(angle) * speed
-      this.diskVelocities[i3 + 1] = 0
-      this.diskVelocities[i3 + 2] = Math.cos(angle) * speed
+    // Create shader material with physically accurate rendering
+    this.accretionDiskMaterial = createAccretionDiskMaterial(this.blackHoleRadius)
 
-      // Color based on temperature (hotter closer to black hole)
-      const temperature = 1 - (radius - this.accretionDiskInnerRadius) /
-        (this.accretionDiskOuterRadius - this.accretionDiskInnerRadius)
+    this.accretionDisk = new THREE.Mesh(geometry, this.accretionDiskMaterial)
+    this.accretionDisk.position.set(0, 0, 0)
 
-      // Hot inner disk (blue-white) to cooler outer disk (red-orange)
-      if (temperature > 0.7) {
-        // Blue-white (very hot)
-        this.diskColors[i3] = 0.8 + temperature * 0.2
-        this.diskColors[i3 + 1] = 0.9 + temperature * 0.1
-        this.diskColors[i3 + 2] = 1.0
-      } else if (temperature > 0.4) {
-        // White-yellow (hot)
-        this.diskColors[i3] = 1.0
-        this.diskColors[i3 + 1] = 0.9
-        this.diskColors[i3 + 2] = 0.7 + temperature * 0.3
-      } else {
-        // Orange-red (cooler)
-        this.diskColors[i3] = 1.0
-        this.diskColors[i3 + 1] = 0.4 + temperature * 0.5
-        this.diskColors[i3 + 2] = 0.2
-      }
-    }
-
-    this.accretionDiskGeometry.setAttribute(
-      'position',
-      new THREE.BufferAttribute(this.diskPositions, 3)
-    )
-    this.accretionDiskGeometry.setAttribute(
-      'color',
-      new THREE.BufferAttribute(this.diskColors, 3)
-    )
-
-    // Accretion disk material with vertex colors
-    this.accretionDiskMaterial = new THREE.PointsMaterial({
-      size: 0.3,
-      vertexColors: true,
-      transparent: true,
-      opacity: 0.0, // Start invisible
-      blending: THREE.AdditiveBlending,
-      depthWrite: false,
-    })
-
-    this.accretionDisk = new THREE.Points(
-      this.accretionDiskGeometry,
-      this.accretionDiskMaterial
-    )
+    console.log('Accretion disk created with shader material')
     this.scene.add(this.accretionDisk)
   }
 
@@ -199,6 +154,14 @@ export class BlackHole {
   public update(deltaTime: number): void {
     this.time += deltaTime
 
+    // Update event horizon shader uniforms
+    this.eventHorizonMaterial.uniforms.time.value = this.time
+    // cameraPosition is automatically updated by Three.js
+
+    // Update accretion disk shader uniforms
+    this.accretionDiskMaterial.uniforms.time.value = this.time
+    // cameraPosition is automatically updated by Three.js
+
     // Handle formation animation
     if (this.isForming) {
       this.formationProgress += deltaTime / this.formationDuration
@@ -209,59 +172,16 @@ export class BlackHole {
       }
 
       // Fade in all elements
-      const material = this.eventHorizon.material as THREE.MeshBasicMaterial
-      material.opacity = this.formationProgress * 1.0
+      this.eventHorizonMaterial.opacity = this.formationProgress * 1.0
+      this.eventHorizonMaterial.uniforms.glowIntensity.value = this.formationProgress * 8.0 // Match shader base value
 
       const lensingMaterial = this.lensingRing.material as THREE.MeshBasicMaterial
       lensingMaterial.opacity = this.formationProgress * 0.6
 
-      this.accretionDiskMaterial.opacity = this.formationProgress * 0.8
+      // Fade in accretion disk via shader uniform
+      this.accretionDiskMaterial.uniforms.globalOpacity.value = this.formationProgress * 1.0
       this.jetsMaterial.opacity = this.formationProgress * 0.7
     }
-
-    // Rotate accretion disk
-    this.accretionDisk.rotation.y += deltaTime * 0.2
-
-    // Update accretion disk particles
-    const diskPositions = this.accretionDiskGeometry.attributes.position.array as Float32Array
-
-    for (let i = 0; i < this.diskParticleCount; i++) {
-      const i3 = i * 3
-
-      const x = diskPositions[i3]
-      const y = diskPositions[i3 + 1]
-      const z = diskPositions[i3 + 2]
-
-      // Current radius from black hole
-      const radius = Math.sqrt(x * x + z * z)
-
-      // Orbital motion
-      const angle = Math.atan2(z, x)
-      const orbitalSpeed = 0.8 / Math.sqrt(radius) // Keplerian
-      const newAngle = angle + orbitalSpeed * deltaTime
-
-      // Gradually spiral inward
-      const spiralInwardSpeed = 0.05 * deltaTime
-      const newRadius = Math.max(radius - spiralInwardSpeed, this.accretionDiskInnerRadius)
-
-      // Update position
-      diskPositions[i3] = Math.cos(newAngle) * newRadius
-      diskPositions[i3 + 2] = Math.sin(newAngle) * newRadius
-
-      // Add turbulence
-      diskPositions[i3 + 1] += (Math.random() - 0.5) * 0.02
-
-      // If particle gets too close, respawn at outer edge
-      if (newRadius <= this.accretionDiskInnerRadius + 0.5) {
-        const spawnRadius = this.accretionDiskOuterRadius - Math.random() * 2
-        const spawnAngle = Math.random() * Math.PI * 2
-        diskPositions[i3] = Math.cos(spawnAngle) * spawnRadius
-        diskPositions[i3 + 1] = (Math.random() - 0.5) * 0.5
-        diskPositions[i3 + 2] = Math.sin(spawnAngle) * spawnRadius
-      }
-    }
-
-    this.accretionDiskGeometry.attributes.position.needsUpdate = true
 
     // Update jets
     const jetPositions = this.jetsGeometry.attributes.position.array as Float32Array
@@ -295,17 +215,18 @@ export class BlackHole {
 
     // Subtle rotation of event horizon (for effect)
     this.eventHorizon.rotation.y += deltaTime * 0.1
+    console.log(this.eventHorizonMaterial)
   }
 
   public dispose(): void {
     this.eventHorizon.geometry.dispose()
-    ;(this.eventHorizon.material as THREE.Material).dispose()
-    this.accretionDiskGeometry.dispose()
+    this.eventHorizonMaterial.dispose()
+    this.accretionDisk.geometry.dispose()
     this.accretionDiskMaterial.dispose()
     this.jetsGeometry.dispose()
     this.jetsMaterial.dispose()
     this.lensingRing.geometry.dispose()
-    ;(this.lensingRing.material as THREE.Material).dispose()
+      ; (this.lensingRing.material as THREE.Material).dispose()
 
     this.scene.remove(this.eventHorizon)
     this.scene.remove(this.accretionDisk)

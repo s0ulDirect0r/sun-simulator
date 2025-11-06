@@ -37,7 +37,7 @@ export class Star {
   private contractionTime: number = 0
 
   // No fade in needed - start at full opacity for seamless transition
-  private currentOpacity: number = 1.0
+  // private currentOpacity: number = 1.0 // Unused for now
 
   // Red giant expansion state
   private isRedGiant: boolean = false
@@ -533,13 +533,30 @@ export class Star {
   }
 
   public dispose(): void {
+    // Remove all meshes from scene
+    this.scene.remove(this.star)
+    this.scene.remove(this.starLight)
+    this.scene.remove(this.shockwave)
+    this.scene.remove(this.surfaceTexture)
+    this.scene.remove(this.corona)
+    this.scene.remove(this.surfaceParticles)
+
+    // Dispose geometries and materials
     this.star.geometry.dispose()
     ;(this.star.material as THREE.Material).dispose()
+    this.shockwave.geometry.dispose()
+    this.shockwaveMaterial.dispose()
     this.coronaGeometry.dispose()
     this.coronaMaterial.dispose()
     this.surfaceGeometry.dispose()
     this.surfaceMaterial.dispose()
     this.surfaceTextureGeometry.dispose()
     this.surfaceTextureMaterial.dispose()
+
+    // Dispose supernova flash if it exists
+    if (this.supernovaFlash) {
+      this.supernovaFlash.dispose()
+      this.supernovaFlash = null
+    }
   }
 }

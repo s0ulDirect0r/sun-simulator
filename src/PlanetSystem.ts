@@ -93,7 +93,7 @@ export class PlanetSystem {
   }
 
   private createPlanets(): void {
-    this.planetData.forEach((planetConfig, index) => {
+    this.planetData.forEach((planetConfig, _index) => {
       // Create planet
       const geometry = new THREE.SphereGeometry(planetConfig.radius, 32, 32)
       const material = new THREE.MeshStandardMaterial({
