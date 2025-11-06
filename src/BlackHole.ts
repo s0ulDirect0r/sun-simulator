@@ -5,7 +5,7 @@ import { createJetTrailMaterial } from './shaders/JetTrailShader'
 
 export class BlackHole {
   private scene: THREE.Scene
-  // private camera: THREE.Camera // Not needed - Three.js provides cameraPosition automatically
+  private camera: THREE.Camera // Needed for gravitational lensing calculations
   private eventHorizon!: THREE.Mesh
   private eventHorizonMaterial!: THREE.ShaderMaterial
   private accretionDisk!: THREE.Mesh
@@ -32,9 +32,9 @@ export class BlackHole {
   private formationDuration: number = 4.0
   private isForming: boolean = true
 
-  constructor(scene: THREE.Scene, _camera: THREE.Camera) {
+  constructor(scene: THREE.Scene, camera: THREE.Camera) {
     this.scene = scene
-    // camera not needed - Three.js provides cameraPosition automatically
+    this.camera = camera
 
     this.createEventHorizon()
     this.createAccretionDisk()

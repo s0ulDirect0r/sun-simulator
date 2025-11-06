@@ -22,9 +22,12 @@ varying vec3 vWorldPosition;
 varying vec3 vNormal;
 varying float vRadius;
 varying float vOrbitalVelocity;
+varying float vDistFromEventHorizon; // For gravitational redshift
 
 uniform float time;
 uniform float schwarzschildRadius;
+// cameraPosition is provided automatically by Three.js
+uniform float lensingStrength; // Artistic control (default 1.0)
 
 void main() {
   vPosition = position;
@@ -44,8 +47,46 @@ void main() {
 
   vec3 animatedPosition = vec3(rotatedPos.x, position.y, rotatedPos.y);
 
+  // === GRAVITATIONAL LENSING ===
+  // Apply light bending to create "warped disk" appearance
+
   vec4 worldPosition = modelMatrix * vec4(animatedPosition, 1.0);
+  vec3 worldPos = worldPosition.xyz;
+
+  // Calculate ray from camera to vertex
+  vec3 toVertex = worldPos - cameraPosition;
+  float distToVertex = length(toVertex);
+  vec3 rayDir = toVertex / distToVertex;
+
+  // Distance from black hole (at origin)
+  float distFromBlackHole = length(worldPos);
+
+  // Calculate impact parameter (closest approach distance of light ray to black hole)
+  // For a light ray passing at distance r, impact parameter b ≈ r * sin(θ)
+  vec3 toBlackHole = -normalize(worldPos);
+  float cosAngle = dot(rayDir, toBlackHole);
+  float sinAngle = sqrt(max(0.0, 1.0 - cosAngle * cosAngle));
+  float impactParameter = distFromBlackHole * sinAngle;
+
+  // Schwarzschild deflection angle: α ≈ 4GM/(c²b) = 2*Rs/b
+  // Clamp to prevent extreme deflection near event horizon
+  float clampedImpact = max(impactParameter, schwarzschildRadius * 1.2);
+  float deflectionAngle = (2.0 * schwarzschildRadius / clampedImpact) * lensingStrength;
+
+  // Apply deflection as vertical displacement (creates "wrap around" effect)
+  // Disk appears to bend up/down around the black hole
+  float verticalWarp = deflectionAngle * distFromBlackHole * 0.15;
+
+  // Direction depends on viewing angle
+  float viewFactor = sign(cameraPosition.y) * (1.0 - abs(cosAngle));
+  animatedPosition.y += verticalWarp * viewFactor;
+
+  // Recalculate world position with warped geometry
+  worldPosition = modelMatrix * vec4(animatedPosition, 1.0);
   vWorldPosition = worldPosition.xyz;
+
+  // Store distance from event horizon for gravitational redshift
+  vDistFromEventHorizon = distFromBlackHole / schwarzschildRadius;
 
   gl_Position = projectionMatrix * modelViewMatrix * vec4(animatedPosition, 1.0);
 }
@@ -57,6 +98,7 @@ varying vec3 vWorldPosition;
 varying vec3 vNormal;
 varying float vRadius;
 varying float vOrbitalVelocity;
+varying float vDistFromEventHorizon; // Distance in units of Schwarzschild radius
 
 uniform float time;
 uniform float schwarzschildRadius;
@@ -149,8 +191,28 @@ void main() {
   // Brightness ∝ (1 + v·view_dir)^3 for relativistic particles
   float relativisticBeaming = pow(max(0.5, 1.0 + dopplerFactor * vOrbitalVelocity), 2.5);
 
+  // === GRAVITATIONAL EFFECTS ===
+
+  // Gravitational redshift: light loses energy climbing out of gravitational well
+  // Frequency shift: ν_observed / ν_emitted = sqrt(1 - Rs/r)
+  // Closer to event horizon → more redshift
+  float redshiftFactor = sqrt(max(0.1, 1.0 - 1.0 / vDistFromEventHorizon));
+  // Shift color toward red (reduce blue/green channels)
+  vec3 redshiftedColor = baseColor;
+  if (vDistFromEventHorizon < 3.0) { // Strong effect near ISCO
+    redshiftedColor.r = mix(baseColor.r, 1.0, (1.0 - redshiftFactor) * 0.3);
+    redshiftedColor.g = mix(baseColor.g, baseColor.r * 0.7, (1.0 - redshiftFactor) * 0.5);
+    redshiftedColor.b = mix(baseColor.b, baseColor.r * 0.4, (1.0 - redshiftFactor) * 0.7);
+  }
+
+  // Photon sphere brightness boost (at 1.5× Schwarzschild radius)
+  // Light trapped in unstable orbits creates bright ring
+  float photonSphereRadius = 1.5; // In units of Schwarzschild radius
+  float distToPhotonSphere = abs(vDistFromEventHorizon - photonSphereRadius);
+  float photonSphereBoost = 1.0 + exp(-distToPhotonSphere * 8.0) * 2.5;
+
   // Combine all effects
-  vec3 finalColor = baseColor * brightnessMod * dopplerBoost * relativisticBeaming;
+  vec3 finalColor = redshiftedColor * brightnessMod * dopplerBoost * relativisticBeaming * photonSphereBoost;
 
   // Alpha gradient: thicker/brighter at ISCO, thinner at edges
   float alphaByRadius = 1.0 - pow(normalizedRadius, 1.5);
@@ -187,6 +249,7 @@ export function createAccretionDiskMaterial(
       innerRadius: { value: schwarzschildRadius * 2.0 }, // Inner edge
       outerRadius: { value: schwarzschildRadius * 12.0 }, // Outer edge
       // cameraPosition is provided automatically by Three.js
+      lensingStrength: { value: 1.0 }, // Artistic control (1.0 = physically inspired)
       globalOpacity: { value: 0.0 } // Start invisible for formation animation
     },
     transparent: true,
