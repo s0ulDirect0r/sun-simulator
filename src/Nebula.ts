@@ -128,11 +128,35 @@ export class Nebula {
       this.velocities[i3 + 1] = (Math.random() - 0.5) * 0.003
       this.velocities[i3 + 2] = (Math.random() - 0.5) * 0.003
 
-      // Set colors (bluish-purple nebula with some variation) - brighter for more glow
-      const colorVariation = Math.random() * 0.4
-      const r = 0.5 + colorVariation
-      const g = 0.6 + colorVariation
-      const b = 1.0 + colorVariation * 0.5
+      // Multi-color nebula regions like real nebulae (hydrogen, oxygen, sulfur emissions)
+      const colorType = Math.random()
+      let r: number, g: number, b: number
+
+      if (colorType < 0.35) {
+        // Blue region (oxygen emission) - ionized gas
+        const variation = Math.random() * 0.3
+        r = 0.3 + variation
+        g = 0.6 + variation
+        b = 1.0
+      } else if (colorType < 0.6) {
+        // Purple/magenta region (hydrogen-alpha)
+        const variation = Math.random() * 0.3
+        r = 0.8 + variation * 0.2
+        g = 0.3 + variation
+        b = 0.9 + variation * 0.1
+      } else if (colorType < 0.8) {
+        // Pink/red region (hydrogen)
+        const variation = Math.random() * 0.3
+        r = 1.0
+        g = 0.4 + variation
+        b = 0.6 + variation
+      } else {
+        // Orange/yellow region (sulfur, warm dust)
+        const variation = Math.random() * 0.3
+        r = 1.0
+        g = 0.7 + variation * 0.3
+        b = 0.3 + variation
+      }
 
       this.colors[i3] = r
       this.colors[i3 + 1] = g

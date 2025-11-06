@@ -10,13 +10,40 @@
     <div id="app">
       <canvas id="canvas"></canvas>
 
+      <!-- Main Info Panel -->
       <div id="controls">
-        <h1>Sun Simulator</h1>
+        <h1>☀️ Stellar Evolution Simulator</h1>
         <div id="phase-info">
           <span id="current-phase">Initializing...</span>
         </div>
+        <div id="phase-description" style="margin-top: 8px; font-size: 12px; color: #999; max-width: 280px; line-height: 1.4;">
+          Watch as a star is born from a nebula, lives its life, and dies in spectacular fashion.
+        </div>
         <div id="debug-info" style="margin-top: 10px; font-size: 12px; font-family: monospace; color: #888;">
           <div id="debug-radius"></div>
+        </div>
+      </div>
+
+      <!-- Interactive Controls Panel -->
+      <div id="interactive-controls">
+        <div class="control-group">
+          <button id="btn-play-pause" class="control-btn">⏸️ Pause</button>
+          <button id="btn-reset" class="control-btn">🔄 Reset</button>
+        </div>
+
+        <div class="control-group" style="margin-top: 10px;">
+          <label for="speed-control" style="font-size: 12px; color: #aaa;">Speed</label>
+          <input type="range" id="speed-control" min="0.1" max="5" step="0.1" value="1" style="width: 100%;">
+          <span id="speed-display" style="font-size: 11px; color: #888;">1.0x</span>
+        </div>
+
+        <div class="control-group" style="margin-top: 10px;">
+          <button id="btn-fullscreen" class="control-btn">⛶ Fullscreen</button>
+        </div>
+
+        <div style="margin-top: 10px; font-size: 10px; color: #666; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
+          <strong>Controls:</strong> Mouse drag to rotate • Scroll to zoom<br>
+          <strong>Keys:</strong> Space = pause • R = reset • F = fullscreen
         </div>
       </div>
     </div>

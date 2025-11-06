@@ -7,12 +7,19 @@ import { UnrealBloomPass } from 'three/examples/jsm/postprocessing/UnrealBloomPa
 import { Nebula } from './Nebula'
 import { Star } from './Star'
 import { IgnitionBurst } from './IgnitionBurst'
+import { PlanetSystem } from './PlanetSystem'
+import { BlackHole } from './BlackHole'
+import { SupernovaRemnant } from './SupernovaRemnant'
+import { FilmGrainPass } from './FilmGrainPass'
+import { VignettePass } from './VignettePass'
+import { Starfield } from './Starfield'
 
 enum SimulationPhase {
   NEBULA_COLLAPSE = 'NEBULA_COLLAPSE',
   MAIN_SEQUENCE = 'MAIN_SEQUENCE',
   RED_GIANT = 'RED_GIANT',
-  SUPERNOVA = 'SUPERNOVA'
+  SUPERNOVA = 'SUPERNOVA',
+  BLACK_HOLE = 'BLACK_HOLE'
 }
 
 class SunSimulator {
@@ -26,6 +33,10 @@ class SunSimulator {
   private nebula: Nebula | null = null
   private star: Star | null = null
   private ignitionBurst: IgnitionBurst | null = null
+  private planetSystem: PlanetSystem | null = null
+  private blackHole: BlackHole | null = null
+  private supernovaRemnant: SupernovaRemnant | null = null
+  private starfield: Starfield | null = null
   private clock: THREE.Clock
   private currentPhase: SimulationPhase = SimulationPhase.NEBULA_COLLAPSE
   private transitionProgress: number = 0
@@ -38,7 +49,11 @@ class SunSimulator {
   private mainSequenceDuration: number = 30.0 // 30 seconds in main sequence before red giant
   private redGiantTimer: number = 0
   private redGiantDuration: number = 15.0 // 15 seconds in red giant before supernova
+  private supernovaTimer: number = 0
+  private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
   private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
+  private isPaused: boolean = false
+  private timeScale: number = 1.0
 
   constructor() {
     // Get canvas element
@@ -87,6 +102,14 @@ class SunSimulator {
     )
     this.composer.addPass(this.bloomPass)
 
+    // Add cinematic effects
+    const filmGrainPass = new FilmGrainPass()
+    this.composer.addPass(filmGrainPass)
+
+    const vignettePass = new VignettePass(0.4)
+    vignettePass.renderToScreen = true
+    this.composer.addPass(vignettePass)
+
     // Initialize orbit controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
     this.controls.enableDamping = true
@@ -100,6 +123,9 @@ class SunSimulator {
     // Initialize clock for delta time
     this.clock = new THREE.Clock()
 
+    // Create starfield background
+    this.starfield = new Starfield(this.scene)
+
     // Create nebula
     this.nebula = new Nebula(this.scene)
 
@@ -107,7 +133,13 @@ class SunSimulator {
     window.addEventListener('resize', this.onWindowResize.bind(this))
 
     // Update phase info
-    this.updatePhaseInfo('Phase 1: Nebula Collapse')
+    this.updatePhaseInfo(
+      'Phase 1: Nebula Collapse',
+      'A vast cloud of gas and dust collapses under gravity. Matter spirals inward, heating up as a protostar begins to form.'
+    )
+
+    // Set up interactive controls
+    this.setupControls()
 
     // Start animation loop
     this.animate()
@@ -136,7 +168,7 @@ class SunSimulator {
     this.composer.setSize(window.innerWidth, window.innerHeight)
   }
 
-  private updatePhaseInfo(phase: string): void {
+  private updatePhaseInfo(phase: string, description?: string): void {
     if (phase === this.lastPhaseText) {
       return
     }
@@ -145,6 +177,12 @@ class SunSimulator {
 
     if (this.phaseElement) {
       this.phaseElement.textContent = phase
+    }
+
+    // Update phase description
+    const descElement = document.getElementById('phase-description')
+    if (descElement && description) {
+      descElement.textContent = description
     }
   }
 
@@ -170,11 +208,82 @@ class SunSimulator {
     this.updatePhaseInfo(phaseText)
   }
 
+  private setupControls(): void {
+    // Play/Pause button
+    const playPauseBtn = document.getElementById('btn-play-pause')
+    if (playPauseBtn) {
+      playPauseBtn.addEventListener('click', () => {
+        this.isPaused = !this.isPaused
+        playPauseBtn.textContent = this.isPaused ? '▶️ Play' : '⏸️ Pause'
+      })
+    }
+
+    // Reset button
+    const resetBtn = document.getElementById('btn-reset')
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        window.location.reload()
+      })
+    }
+
+    // Speed control
+    const speedControl = document.getElementById('speed-control') as HTMLInputElement
+    const speedDisplay = document.getElementById('speed-display')
+    if (speedControl && speedDisplay) {
+      speedControl.addEventListener('input', () => {
+        this.timeScale = parseFloat(speedControl.value)
+        speedDisplay.textContent = `${this.timeScale.toFixed(1)}x`
+      })
+    }
+
+    // Fullscreen button
+    const fullscreenBtn = document.getElementById('btn-fullscreen')
+    if (fullscreenBtn) {
+      fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen()
+        } else {
+          document.exitFullscreen()
+        }
+      })
+    }
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      switch (e.key.toLowerCase()) {
+        case ' ':
+          e.preventDefault()
+          this.isPaused = !this.isPaused
+          if (playPauseBtn) {
+            playPauseBtn.textContent = this.isPaused ? '▶️ Play' : '⏸️ Pause'
+          }
+          break
+        case 'r':
+          window.location.reload()
+          break
+        case 'f':
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen()
+          } else {
+            document.exitFullscreen()
+          }
+          break
+      }
+    })
+  }
+
   private animate(): void {
     requestAnimationFrame(this.animate.bind(this))
 
-    // Get delta time
-    const deltaTime = this.clock.getDelta()
+    // Get delta time and apply time scale
+    let deltaTime = this.clock.getDelta()
+
+    // Apply pause and time scale
+    if (this.isPaused) {
+      deltaTime = 0
+    } else {
+      deltaTime *= this.timeScale
+    }
 
     // Update controls
     this.controls.update()
@@ -215,6 +324,22 @@ class SunSimulator {
   }
 
   private updatePhaseLogic(deltaTime: number): void {
+    // Update starfield
+    if (this.starfield) {
+      this.starfield.update(deltaTime)
+    }
+
+    // Update planet system if it exists
+    if (this.planetSystem) {
+      const currentStarRadius = this.star ? this.star['currentRadius'] || 4.0 : 4.0
+      this.planetSystem.update(deltaTime, currentStarRadius)
+    }
+
+    // Update supernova remnant if it exists
+    if (this.supernovaRemnant) {
+      this.supernovaRemnant.update(deltaTime)
+    }
+
     switch (this.currentPhase) {
       case SimulationPhase.NEBULA_COLLAPSE:
         if (this.nebula) {
@@ -258,6 +383,18 @@ class SunSimulator {
       case SimulationPhase.SUPERNOVA:
         if (this.star) {
           this.star.update(deltaTime)
+
+          // Track supernova duration and trigger black hole
+          this.supernovaTimer += deltaTime
+          if (this.supernovaTimer >= this.supernovaDuration) {
+            this.startBlackHole()
+          }
+        }
+        break
+
+      case SimulationPhase.BLACK_HOLE:
+        if (this.blackHole) {
+          this.blackHole.update(deltaTime)
         }
         break
     }
@@ -276,7 +413,10 @@ class SunSimulator {
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
     }
-    this.updatePhaseInfo('Phase 3: Red Giant Expansion')
+    this.updatePhaseInfo(
+      'Phase 3: Red Giant Expansion',
+      'Hydrogen depleted. The star swells to enormous size as it fuses helium in its core. Planets are engulfed.'
+    )
   }
 
   private startSupernova(): void {
@@ -284,15 +424,58 @@ class SunSimulator {
 
     if (this.star) {
       this.star.startSupernova()
+
+      // Create supernova remnant
+      const currentStarRadius = this.star['currentRadius'] || 25.0
+      this.supernovaRemnant = new SupernovaRemnant(this.scene, currentStarRadius)
+    }
+
+    // Hide planets during supernova
+    if (this.planetSystem) {
+      this.planetSystem.hide()
     }
 
     // Update phase
     this.currentPhase = SimulationPhase.SUPERNOVA
+    this.supernovaTimer = 0
     this.lastDebugText = ''
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
     }
-    this.updatePhaseInfo('Phase 4: SUPERNOVA!')
+    this.updatePhaseInfo(
+      'Phase 4: SUPERNOVA!',
+      'Catastrophic core collapse! The star explodes with the energy of billions of suns, scattering heavy elements across the cosmos.'
+    )
+  }
+
+  private startBlackHole(): void {
+    console.log('Collapsing into black hole...')
+
+    // Create black hole
+    this.blackHole = new BlackHole(this.scene)
+
+    // Remove star
+    if (this.star) {
+      this.star.dispose()
+      this.star = null
+    }
+
+    // Remove planets
+    if (this.planetSystem) {
+      this.planetSystem.dispose()
+      this.planetSystem = null
+    }
+
+    // Update phase
+    this.currentPhase = SimulationPhase.BLACK_HOLE
+    this.lastDebugText = ''
+    if (this.debugRadiusElement) {
+      this.debugRadiusElement.textContent = ''
+    }
+    this.updatePhaseInfo(
+      'Phase 5: Black Hole',
+      'The core collapses into a singularity. Matter spirals into the accretion disk, warping spacetime itself. Nothing escapes.'
+    )
   }
 
   private startTransitionToMainSequence(): void {
@@ -304,6 +487,10 @@ class SunSimulator {
     // Create star at protostar's current size
     this.star = new Star(this.scene, protostarRadius)
     this.ignitionBurst = new IgnitionBurst(this.scene)
+
+    // Create planet system
+    this.planetSystem = new PlanetSystem(this.scene)
+    this.planetSystem.show()
 
     // Fade out and dispose of nebula over time
     if (this.nebula) {
@@ -360,7 +547,10 @@ class SunSimulator {
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
     }
-    this.updatePhaseInfo('Phase 2: Main Sequence Star')
+    this.updatePhaseInfo(
+      'Phase 2: Main Sequence Star',
+      'Fusion ignited! The star enters its stable life phase, burning hydrogen into helium for billions of years. Planets form in orbit.'
+    )
   }
 }
 
