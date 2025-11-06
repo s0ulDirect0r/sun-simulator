@@ -48,6 +48,8 @@ class SunSimulator {
   private supernovaTimer: number = 0
   private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
   private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
+  private isPaused: boolean = false
+  private timeScale: number = 1.0
 
   constructor() {
     // Get canvas element
@@ -118,6 +120,9 @@ class SunSimulator {
     // Update phase info
     this.updatePhaseInfo('Phase 1: Nebula Collapse')
 
+    // Set up interactive controls
+    this.setupControls()
+
     // Start animation loop
     this.animate()
   }
@@ -179,11 +184,180 @@ class SunSimulator {
     this.updatePhaseInfo(phaseText)
   }
 
+  private setupControls(): void {
+    // Play/Pause button
+    const playPauseBtn = document.getElementById('btn-play-pause')
+    if (playPauseBtn) {
+      playPauseBtn.addEventListener('click', () => {
+        this.isPaused = !this.isPaused
+        playPauseBtn.textContent = this.isPaused ? '▶️ Play' : '⏸️ Pause'
+      })
+    }
+
+    // Reset button
+    const resetBtn = document.getElementById('btn-reset')
+    if (resetBtn) {
+      resetBtn.addEventListener('click', () => {
+        window.location.reload()
+      })
+    }
+
+    // Speed control
+    const speedControl = document.getElementById('speed-control') as HTMLInputElement
+    const speedDisplay = document.getElementById('speed-display')
+    if (speedControl && speedDisplay) {
+      speedControl.addEventListener('input', () => {
+        this.timeScale = parseFloat(speedControl.value)
+        speedDisplay.textContent = `${this.timeScale.toFixed(1)}x`
+      })
+    }
+
+    // Phase skip buttons
+    const phaseButtons = document.querySelectorAll('.phase-btn')
+    phaseButtons.forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const phase = parseInt(btn.getAttribute('data-phase') || '0')
+        this.jumpToPhase(phase)
+      })
+    })
+
+    // Fullscreen button
+    const fullscreenBtn = document.getElementById('btn-fullscreen')
+    if (fullscreenBtn) {
+      fullscreenBtn.addEventListener('click', () => {
+        if (!document.fullscreenElement) {
+          document.documentElement.requestFullscreen()
+        } else {
+          document.exitFullscreen()
+        }
+      })
+    }
+
+    // Keyboard shortcuts
+    window.addEventListener('keydown', (e) => {
+      switch (e.key.toLowerCase()) {
+        case ' ':
+          e.preventDefault()
+          this.isPaused = !this.isPaused
+          if (playPauseBtn) {
+            playPauseBtn.textContent = this.isPaused ? '▶️ Play' : '⏸️ Pause'
+          }
+          break
+        case 'r':
+          window.location.reload()
+          break
+        case 'f':
+          if (!document.fullscreenElement) {
+            document.documentElement.requestFullscreen()
+          } else {
+            document.exitFullscreen()
+          }
+          break
+        case '1':
+          this.jumpToPhase(0)
+          break
+        case '2':
+          this.jumpToPhase(1)
+          break
+        case '3':
+          this.jumpToPhase(2)
+          break
+        case '4':
+          this.jumpToPhase(3)
+          break
+        case '5':
+          this.jumpToPhase(4)
+          break
+      }
+    })
+  }
+
+  private jumpToPhase(phase: number): void {
+    // Clean up current state
+    if (this.nebula) {
+      this.nebula.dispose()
+      this.nebula = null
+    }
+    if (this.star) {
+      this.star.dispose()
+      this.star = null
+    }
+    if (this.planetSystem) {
+      this.planetSystem.dispose()
+      this.planetSystem = null
+    }
+    if (this.blackHole) {
+      this.blackHole.dispose()
+      this.blackHole = null
+    }
+    if (this.supernovaRemnant) {
+      this.supernovaRemnant.dispose()
+      this.supernovaRemnant = null
+    }
+
+    // Reset timers
+    this.mainSequenceTimer = 0
+    this.redGiantTimer = 0
+    this.supernovaTimer = 0
+
+    // Jump to requested phase
+    switch (phase) {
+      case 0: // Nebula
+        this.nebula = new Nebula(this.scene)
+        this.currentPhase = SimulationPhase.NEBULA_COLLAPSE
+        this.updatePhaseInfo('Phase 1: Nebula Collapse')
+        break
+      case 1: // Main Sequence
+        this.star = new Star(this.scene, 4.0)
+        this.planetSystem = new PlanetSystem(this.scene)
+        this.planetSystem.show()
+        this.currentPhase = SimulationPhase.MAIN_SEQUENCE
+        this.updatePhaseInfo('Phase 2: Main Sequence Star')
+        break
+      case 2: // Red Giant
+        this.star = new Star(this.scene, 4.0)
+        this.planetSystem = new PlanetSystem(this.scene)
+        this.planetSystem.show()
+        this.star.startRedGiantExpansion()
+        this.currentPhase = SimulationPhase.RED_GIANT
+        this.updatePhaseInfo('Phase 3: Red Giant Expansion')
+        break
+      case 3: // Supernova
+        this.star = new Star(this.scene, 25.0)
+        this.star['isRedGiant'] = true
+        this.star['currentRadius'] = 25.0
+        this.star.startSupernova()
+        this.supernovaRemnant = new SupernovaRemnant(this.scene, 25.0)
+        this.currentPhase = SimulationPhase.SUPERNOVA
+        this.updatePhaseInfo('Phase 4: SUPERNOVA!')
+        break
+      case 4: // Black Hole
+        this.blackHole = new BlackHole(this.scene)
+        this.supernovaRemnant = new SupernovaRemnant(this.scene, 25.0)
+        this.currentPhase = SimulationPhase.BLACK_HOLE
+        this.updatePhaseInfo('Phase 5: Black Hole')
+        break
+    }
+
+    // Clear debug info
+    this.lastDebugText = ''
+    if (this.debugRadiusElement) {
+      this.debugRadiusElement.textContent = ''
+    }
+  }
+
   private animate(): void {
     requestAnimationFrame(this.animate.bind(this))
 
-    // Get delta time
-    const deltaTime = this.clock.getDelta()
+    // Get delta time and apply time scale
+    let deltaTime = this.clock.getDelta()
+
+    // Apply pause and time scale
+    if (this.isPaused) {
+      deltaTime = 0
+    } else {
+      deltaTime *= this.timeScale
+    }
 
     // Update controls
     this.controls.update()

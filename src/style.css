@@ -28,15 +28,17 @@ body {
   position: absolute;
   top: 20px;
   left: 20px;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.8);
   padding: 20px;
-  border-radius: 8px;
+  border-radius: 12px;
   backdrop-filter: blur(10px);
-  border: 1px solid rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
 }
 
 #controls h1 {
-  font-size: 24px;
+  font-size: 22px;
   margin-bottom: 10px;
   background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
   -webkit-background-clip: text;
@@ -52,4 +54,114 @@ body {
 #current-phase {
   color: #fff;
   font-weight: 500;
+}
+
+/* Interactive Controls Panel */
+#interactive-controls {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 16px;
+  border-radius: 12px;
+  backdrop-filter: blur(10px);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4);
+}
+
+.control-group {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.control-btn {
+  flex: 1;
+  padding: 10px 16px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.control-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+  border-color: rgba(255, 255, 255, 0.4);
+  transform: translateY(-1px);
+}
+
+.control-btn:active {
+  transform: translateY(0);
+}
+
+.phase-btn {
+  flex: 0 0 calc(50% - 4px);
+  padding: 8px 12px;
+  background: rgba(102, 126, 234, 0.2);
+  border: 1px solid rgba(102, 126, 234, 0.4);
+  border-radius: 6px;
+  color: #aaf;
+  font-size: 11px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  font-family: inherit;
+}
+
+.phase-btn:hover {
+  background: rgba(102, 126, 234, 0.4);
+  border-color: rgba(102, 126, 234, 0.6);
+  transform: translateY(-1px);
+}
+
+.phase-btn:active {
+  transform: translateY(0);
+}
+
+#speed-control {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: rgba(255, 255, 255, 0.2);
+  border-radius: 3px;
+  outline: none;
+  margin: 8px 0 4px;
+}
+
+#speed-control::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+#speed-control::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+#speed-control::-moz-range-thumb {
+  width: 16px;
+  height: 16px;
+  background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+  border-radius: 50%;
+  cursor: pointer;
+  border: none;
+  transition: all 0.2s ease;
+}
+
+#speed-control::-moz-range-thumb:hover {
+  transform: scale(1.2);
+}
+
+#speed-display {
+  display: block;
+  text-align: right;
 }
