@@ -5,20 +5,20 @@ import { createJetTrailMaterial } from './shaders/JetTrailShader'
 
 export class BlackHole {
   private scene: THREE.Scene
-  // private camera: THREE.Camera // Not needed - Three.js provides cameraPosition automatically
-  private eventHorizon!: THREE.Mesh
+  private camera: THREE.Camera // Needed for gravitational lensing calculations
+  public eventHorizon!: THREE.Mesh // Public for debug toggles
   private eventHorizonMaterial!: THREE.ShaderMaterial
-  private accretionDisk!: THREE.Mesh
+  public accretionDisk!: THREE.Mesh // Public for debug toggles
   private accretionDiskMaterial!: THREE.ShaderMaterial
 
   // Jets of matter escaping along poles (shader-based)
-  private jetTop!: THREE.Mesh
-  private jetBottom!: THREE.Mesh
+  public jetTop!: THREE.Mesh // Public for debug toggles
+  public jetBottom!: THREE.Mesh // Public for debug toggles
   private jetMaterial!: THREE.ShaderMaterial
   private jetLength: number = 250.0 // Extend far into space for dramatic reach
 
   // Gravitational lensing ring
-  private lensingRing!: THREE.Mesh
+  public lensingRing!: THREE.Mesh // Public for debug toggles
 
   private time: number = 0
   private blackHoleRadius: number = 5.0 // Schwarzschild radius (scaled up for visibility)
@@ -32,9 +32,9 @@ export class BlackHole {
   private formationDuration: number = 4.0
   private isForming: boolean = true
 
-  constructor(scene: THREE.Scene, _camera: THREE.Camera) {
+  constructor(scene: THREE.Scene, camera: THREE.Camera) {
     this.scene = scene
-    // camera not needed - Three.js provides cameraPosition automatically
+    this.camera = camera
 
     this.createEventHorizon()
     this.createAccretionDisk()
@@ -241,6 +241,10 @@ export class BlackHole {
 
   public getEventHorizonRadius(): number {
     return this.blackHoleRadius
+  }
+
+  public getCurrentMass(): number {
+    return this.currentMass
   }
 
   public dispose(): void {

@@ -2,7 +2,7 @@ import * as THREE from 'three'
 
 export class SupernovaRemnant {
   private scene: THREE.Scene
-  private shells: THREE.Points[] = []
+  public shells: THREE.Points[] = [] // Public for debug toggles
   private shellGeometries: THREE.BufferGeometry[] = []
   private shellMaterials: THREE.PointsMaterial[] = []
 
@@ -238,6 +238,11 @@ export class SupernovaRemnant {
 
   public updateEventHorizonRadius(newRadius: number): void {
     this.eventHorizonRadius = newRadius
+  }
+
+  public getActiveParticleCount(): number {
+    // Count non-consumed particles across all shells
+    return this.particleCount * this.shellCount - this.consumedParticles.size
   }
 
   public dispose(): void {

@@ -29,6 +29,10 @@ class SunSimulator {
   private renderer: THREE.WebGLRenderer
   private composer: EffectComposer
   private bloomPass: UnrealBloomPass
+  private filmGrainPass!: FilmGrainPass
+  private vignettePass!: VignettePass
+  private ambientLight!: THREE.AmbientLight
+  private pointLight!: THREE.PointLight
   private controls: OrbitControls
   private canvas: HTMLCanvasElement
   private nebula: Nebula | null = null
@@ -57,6 +61,34 @@ class SunSimulator {
   private isPaused: boolean = false
   private timeScale: number = 1.0
 
+  // Debug state for toggling visual elements
+  private debugState = {
+    accretionDisk: true,
+    jets: true,
+    eventHorizon: true,
+    lensingRing: true,
+    pointLight: true,
+    ambientLight: true,
+    accretionSources: true,
+    supernovaRemnant: true,
+    bloom: true,
+    filmGrain: true,
+    vignette: true,
+    showDebugOverlay: false,
+  }
+
+  // Debug overlay elements
+  private debugOverlay: HTMLElement | null = null
+  private debugFps: HTMLElement | null = null
+  private debugPhase: HTMLElement | null = null
+  private debugMass: HTMLElement | null = null
+  private debugBhRadius: HTMLElement | null = null
+  private debugSourceParticles: HTMLElement | null = null
+  private debugRemnantParticles: HTMLElement | null = null
+  private debugTotalParticles: HTMLElement | null = null
+  private lastFrameTime: number = 0
+  private fps: number = 0
+
   constructor() {
     // Get canvas element
     this.canvas = document.getElementById('canvas') as HTMLCanvasElement
@@ -69,6 +101,16 @@ class SunSimulator {
     this.scene.background = new THREE.Color(0x000000)
     this.phaseElement = document.getElementById('current-phase')
     this.debugRadiusElement = document.getElementById('debug-radius')
+
+    // Initialize debug overlay elements
+    this.debugOverlay = document.getElementById('debug-overlay')
+    this.debugFps = document.getElementById('debug-fps')
+    this.debugPhase = document.getElementById('debug-phase')
+    this.debugMass = document.getElementById('debug-mass')
+    this.debugBhRadius = document.getElementById('debug-bh-radius')
+    this.debugSourceParticles = document.getElementById('debug-source-particles')
+    this.debugRemnantParticles = document.getElementById('debug-remnant-particles')
+    this.debugTotalParticles = document.getElementById('debug-total-particles')
 
     // Initialize camera
     this.camera = new THREE.PerspectiveCamera(
@@ -105,12 +147,12 @@ class SunSimulator {
     this.composer.addPass(this.bloomPass)
 
     // Add cinematic effects
-    const filmGrainPass = new FilmGrainPass()
-    this.composer.addPass(filmGrainPass)
+    this.filmGrainPass = new FilmGrainPass()
+    this.composer.addPass(this.filmGrainPass)
 
-    const vignettePass = new VignettePass(0.4)
-    vignettePass.renderToScreen = true
-    this.composer.addPass(vignettePass)
+    this.vignettePass = new VignettePass(0.4)
+    this.vignettePass.renderToScreen = true
+    this.composer.addPass(this.vignettePass)
 
     // Initialize orbit controls
     this.controls = new OrbitControls(this.camera, this.renderer.domElement)
@@ -149,13 +191,13 @@ class SunSimulator {
 
   private setupLights(): void {
     // Ambient light for nebula illumination (dimmer for dramatic effect)
-    const ambientLight = new THREE.AmbientLight(0x202040, 0.5)
-    this.scene.add(ambientLight)
+    this.ambientLight = new THREE.AmbientLight(0x202040, 0.5)
+    this.scene.add(this.ambientLight)
 
     // Subtle point light at center for forming protostar glow
-    const pointLight = new THREE.PointLight(0xff6600, 0.5, 100)
-    pointLight.position.set(0, 0, 0)
-    this.scene.add(pointLight)
+    this.pointLight = new THREE.PointLight(0xff6600, 0.5, 100)
+    this.pointLight.position.set(0, 0, 0)
+    this.scene.add(this.pointLight)
   }
 
   private onWindowResize(): void {
@@ -208,6 +250,96 @@ class SunSimulator {
     }
 
     this.updatePhaseInfo(phaseText)
+  }
+
+  private updateDebugStats(): void {
+    if (!this.debugState.showDebugOverlay) return
+
+    // Calculate FPS
+    const now = performance.now()
+    if (this.lastFrameTime > 0) {
+      const deltaMs = now - this.lastFrameTime
+      this.fps = Math.round(1000 / deltaMs)
+    }
+    this.lastFrameTime = now
+
+    // Update FPS
+    if (this.debugFps) {
+      this.debugFps.textContent = this.fps.toString()
+    }
+
+    // Update phase
+    if (this.debugPhase) {
+      this.debugPhase.textContent = this.currentPhase
+    }
+
+    // Update black hole stats
+    if (this.blackHole) {
+      if (this.debugMass) {
+        this.debugMass.textContent = `${this.blackHole.getCurrentMass().toFixed(2)} M☉`
+      }
+      if (this.debugBhRadius) {
+        this.debugBhRadius.textContent = `${this.blackHole.getEventHorizonRadius().toFixed(2)} units`
+      }
+    } else {
+      if (this.debugMass) this.debugMass.textContent = 'N/A'
+      if (this.debugBhRadius) this.debugBhRadius.textContent = 'N/A'
+    }
+
+    // Update particle counts
+    let sourceParticles = 0
+    this.accretionSources.forEach(source => {
+      sourceParticles += source.getActiveParticleCount()
+    })
+
+    let remnantParticles = 0
+    if (this.supernovaRemnant) {
+      remnantParticles = this.supernovaRemnant.getActiveParticleCount()
+    }
+
+    const totalParticles = sourceParticles + remnantParticles
+
+    if (this.debugSourceParticles) {
+      this.debugSourceParticles.textContent = sourceParticles.toString()
+    }
+    if (this.debugRemnantParticles) {
+      this.debugRemnantParticles.textContent = remnantParticles.toString()
+    }
+    if (this.debugTotalParticles) {
+      this.debugTotalParticles.textContent = totalParticles.toString()
+    }
+  }
+
+  private applyDebugState(): void {
+    // Lights
+    this.ambientLight.intensity = this.debugState.ambientLight ? 0.5 : 0
+    this.pointLight.intensity = this.debugState.pointLight ? 0.5 : 0
+
+    // Black hole elements
+    if (this.blackHole) {
+      this.blackHole.accretionDisk.visible = this.debugState.accretionDisk
+      this.blackHole.jetTop.visible = this.debugState.jets
+      this.blackHole.jetBottom.visible = this.debugState.jets
+      this.blackHole.eventHorizon.visible = this.debugState.eventHorizon
+      this.blackHole.lensingRing.visible = this.debugState.lensingRing
+    }
+
+    // Accretion sources
+    this.accretionSources.forEach(source => {
+      source.particles.visible = this.debugState.accretionSources
+    })
+
+    // Supernova remnant
+    if (this.supernovaRemnant) {
+      this.supernovaRemnant.shells.forEach(shell => {
+        shell.visible = this.debugState.supernovaRemnant
+      })
+    }
+
+    // Post-processing
+    this.bloomPass.enabled = this.debugState.bloom
+    this.filmGrainPass.enabled = this.debugState.filmGrain
+    this.vignettePass.enabled = this.debugState.vignette
   }
 
   private setupControls(): void {
@@ -270,6 +402,82 @@ class SunSimulator {
             document.exitFullscreen()
           }
           break
+        // Debug toggles
+        case '1':
+          this.debugState.accretionDisk = !this.debugState.accretionDisk
+          this.applyDebugState()
+          console.log(`[DEBUG] Accretion Disk: ${this.debugState.accretionDisk ? 'ON' : 'OFF'}`)
+          break
+        case '2':
+          this.debugState.jets = !this.debugState.jets
+          this.applyDebugState()
+          console.log(`[DEBUG] Jets: ${this.debugState.jets ? 'ON' : 'OFF'}`)
+          break
+        case '3':
+          this.debugState.eventHorizon = !this.debugState.eventHorizon
+          this.applyDebugState()
+          console.log(`[DEBUG] Event Horizon: ${this.debugState.eventHorizon ? 'ON' : 'OFF'}`)
+          break
+        case '4':
+          this.debugState.lensingRing = !this.debugState.lensingRing
+          this.applyDebugState()
+          console.log(`[DEBUG] Lensing Ring: ${this.debugState.lensingRing ? 'ON' : 'OFF'}`)
+          break
+        case '5':
+          this.debugState.accretionSources = !this.debugState.accretionSources
+          this.applyDebugState()
+          console.log(`[DEBUG] Accretion Sources: ${this.debugState.accretionSources ? 'ON' : 'OFF'}`)
+          break
+        case '6':
+          this.debugState.supernovaRemnant = !this.debugState.supernovaRemnant
+          this.applyDebugState()
+          console.log(`[DEBUG] Supernova Remnant: ${this.debugState.supernovaRemnant ? 'ON' : 'OFF'}`)
+          break
+        case 'l':
+          this.debugState.ambientLight = !this.debugState.ambientLight
+          this.debugState.pointLight = this.debugState.ambientLight // Toggle both together
+          this.applyDebugState()
+          console.log(`[DEBUG] Lights: ${this.debugState.ambientLight ? 'ON' : 'OFF'}`)
+          break
+        case 'b':
+          this.debugState.bloom = !this.debugState.bloom
+          this.applyDebugState()
+          console.log(`[DEBUG] Bloom: ${this.debugState.bloom ? 'ON' : 'OFF'}`)
+          break
+        case 'g':
+          this.debugState.filmGrain = !this.debugState.filmGrain
+          this.applyDebugState()
+          console.log(`[DEBUG] Film Grain: ${this.debugState.filmGrain ? 'ON' : 'OFF'}`)
+          break
+        case 'v':
+          this.debugState.vignette = !this.debugState.vignette
+          this.applyDebugState()
+          console.log(`[DEBUG] Vignette: ${this.debugState.vignette ? 'ON' : 'OFF'}`)
+          break
+        case 'd':
+          this.debugState.showDebugOverlay = !this.debugState.showDebugOverlay
+          if (this.debugOverlay) {
+            this.debugOverlay.style.display = this.debugState.showDebugOverlay ? 'block' : 'none'
+          }
+          console.log(`[DEBUG] Debug Overlay: ${this.debugState.showDebugOverlay ? 'ON' : 'OFF'}`)
+          break
+        case 'a':
+          // Toggle all visual elements at once
+          const newState = !this.debugState.accretionDisk // Use first element as reference
+          this.debugState.accretionDisk = newState
+          this.debugState.jets = newState
+          this.debugState.eventHorizon = newState
+          this.debugState.lensingRing = newState
+          this.debugState.ambientLight = newState
+          this.debugState.pointLight = newState
+          this.debugState.accretionSources = newState
+          this.debugState.supernovaRemnant = newState
+          this.debugState.bloom = newState
+          this.debugState.filmGrain = newState
+          this.debugState.vignette = newState
+          this.applyDebugState()
+          console.log(`[DEBUG] Toggle All: ${newState ? 'ON' : 'OFF'}`)
+          break
       }
     })
   }
@@ -320,6 +528,9 @@ class SunSimulator {
       // Bloom gets INSANE during supernova (0.8 base → 3.5 peak)
       this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 3.5, shakeIntensity)
     }
+
+    // Update debug stats if overlay is visible
+    this.updateDebugStats()
 
     // Render scene with post-processing
     this.composer.render()
