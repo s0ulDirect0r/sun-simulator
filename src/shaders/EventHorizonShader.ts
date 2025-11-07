@@ -147,8 +147,8 @@ void main() {
   float turbulence = sin(vUv.x * 20.0 + time) * cos(vUv.y * 20.0 + time * 0.7);
   finalColor += glowColor * turbulence * 0.15 * photonSphereEdge;
 
-  // Extra additive glow boost to make it visible against bright disk
-  finalColor += edgeGlow * 0.5;
+  // Extra additive glow boost to make it visible against bright disk (reduced for better balance)
+  finalColor += edgeGlow * 0.1;
 
   // Set alpha based on distance from center - more opaque at edges
   float alpha = mix(1.0, 0.95 + glowStrength * 0.05, coreDarkness);
@@ -168,7 +168,7 @@ export function createEventHorizonMaterial(schwarzschildRadius: number): THREE.S
       time: { value: 0.0 },
       schwarzschildRadius: { value: schwarzschildRadius },
       glowColor: { value: new THREE.Color(0xff4400) }, // Red-orange photon sphere glow
-      glowIntensity: { value: 8.0 } // Much more intense to compete with disk brightness
+      glowIntensity: { value: 2.0 } // Subtle intensity for balanced bloom
       // cameraPosition is provided automatically by Three.js
     },
     transparent: true,
