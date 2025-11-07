@@ -139,6 +139,7 @@ A web-based interactive simulation that visualizes the complete lifecycle of a s
 
 ## Future Enhancements (Post-MVP)
 - Multiple star types (different masses, different fates)
+  - **Mass-based remnant determination**: Currently 50/50 random choice between neutron star and black hole. Future enhancement: use initial stellar mass thresholds (~8-25 solar masses → neutron star, >25 solar masses → black hole)
 - Binary star systems
 - Formation of planetary systems in detail
 - VR/AR support

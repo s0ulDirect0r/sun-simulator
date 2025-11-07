@@ -9,6 +9,7 @@ import { Star } from './Star'
 import { IgnitionBurst } from './IgnitionBurst'
 import { PlanetSystem } from './PlanetSystem'
 import { BlackHole } from './BlackHole'
+import { NeutronStar } from './NeutronStar'
 import { SupernovaRemnant } from './SupernovaRemnant'
 import { AccretionSource } from './AccretionSource'
 import { FilmGrainPass } from './FilmGrainPass'
@@ -20,7 +21,8 @@ enum SimulationPhase {
   MAIN_SEQUENCE = 'MAIN_SEQUENCE',
   RED_GIANT = 'RED_GIANT',
   SUPERNOVA = 'SUPERNOVA',
-  BLACK_HOLE = 'BLACK_HOLE'
+  BLACK_HOLE = 'BLACK_HOLE',
+  NEUTRON_STAR = 'NEUTRON_STAR'
 }
 
 class SunSimulator {
@@ -40,6 +42,7 @@ class SunSimulator {
   private ignitionBurst: IgnitionBurst | null = null
   private planetSystem: PlanetSystem | null = null
   private blackHole: BlackHole | null = null
+  private neutronStar: NeutronStar | null = null
   private supernovaRemnant: SupernovaRemnant | null = null
   private accretionSources: AccretionSource[] = []
   private starfield: Starfield | null = null
@@ -67,6 +70,9 @@ class SunSimulator {
     jets: true,
     eventHorizon: true,
     lensingRing: true,
+    neutronStarSurface: true,
+    pulsarBeams: true,
+    magneticField: true,
     pointLight: true,
     ambientLight: true,
     accretionSources: true,
@@ -273,13 +279,20 @@ class SunSimulator {
       this.debugPhase.textContent = this.currentPhase
     }
 
-    // Update black hole stats
+    // Update black hole or neutron star stats
     if (this.blackHole) {
       if (this.debugMass) {
         this.debugMass.textContent = `${this.blackHole.getCurrentMass().toFixed(2)} M☉`
       }
       if (this.debugBhRadius) {
-        this.debugBhRadius.textContent = `${this.blackHole.getEventHorizonRadius().toFixed(2)} units`
+        this.debugBhRadius.textContent = `${this.blackHole.getEventHorizonRadius().toFixed(2)} units (event horizon)`
+      }
+    } else if (this.neutronStar) {
+      if (this.debugMass) {
+        this.debugMass.textContent = `${this.neutronStar.getCurrentMass().toFixed(2)} M☉`
+      }
+      if (this.debugBhRadius) {
+        this.debugBhRadius.textContent = `${this.neutronStar.getSurfaceRadius().toFixed(2)} units (surface)`
       }
     } else {
       if (this.debugMass) this.debugMass.textContent = 'N/A'
@@ -322,6 +335,14 @@ class SunSimulator {
       this.blackHole.jetBottom.visible = this.debugState.jets
       this.blackHole.eventHorizon.visible = this.debugState.eventHorizon
       this.blackHole.lensingRing.visible = this.debugState.lensingRing
+    }
+
+    // Neutron star elements
+    if (this.neutronStar) {
+      this.neutronStar.surface.visible = this.debugState.neutronStarSurface
+      this.neutronStar.pulsarBeamTop.visible = this.debugState.pulsarBeams
+      this.neutronStar.pulsarBeamBottom.visible = this.debugState.pulsarBeams
+      this.neutronStar.magneticFieldLines.visible = this.debugState.magneticField
     }
 
     // Accretion sources
@@ -613,6 +634,16 @@ class SunSimulator {
         if (this.supernovaRemnant) {
           this.supernovaRemnant.update(deltaTime)
         }
+        break
+
+      case SimulationPhase.NEUTRON_STAR:
+        if (this.neutronStar) {
+          this.neutronStar.update(deltaTime)
+        }
+        // Continue updating supernova remnant for accretion effect
+        if (this.supernovaRemnant) {
+          this.supernovaRemnant.update(deltaTime)
+        }
         // Update accretion sources (sporadic chunk spawners)
         this.accretionSources.forEach((source) => source.update(deltaTime))
         break
@@ -668,88 +699,170 @@ class SunSimulator {
   }
 
   private startBlackHole(): void {
-    console.log('Collapsing into black hole...')
+    // 50/50 coin flip to determine remnant type
+    const isBlackHole = Math.random() < 0.5
 
-    // Create black hole with camera reference for shader effects
-    this.blackHole = new BlackHole(this.scene, this.camera)
+    if (isBlackHole) {
+      console.log('Collapsing into black hole...')
 
-    // Remove star
-    if (this.star) {
-      this.star.dispose()
-      this.star = null
-    }
+      // Create black hole with camera reference for shader effects
+      this.blackHole = new BlackHole(this.scene, this.camera)
 
-    // Keep supernova remnant alive for accretion - particles will be pulled into black hole
-    // Enable accretion mode with gravitational attraction
-    if (this.supernovaRemnant && this.blackHole) {
-      this.supernovaRemnant.enableAccretion(
-        new THREE.Vector3(0, 0, 0),  // Black hole at origin
-        0.15,                         // Accretion strength (3x stronger)
-        this.blackHole.getEventHorizonRadius()  // Match actual event horizon size
-      )
+      // Remove star
+      if (this.star) {
+        this.star.dispose()
+        this.star = null
+      }
 
-      // Set up particle consumption callback
-      this.supernovaRemnant.setConsumptionCallback((mass) => {
-        if (this.blackHole) {
-          this.blackHole.addMass(mass)
+      // Keep supernova remnant alive for accretion - particles will be pulled into black hole
+      // Enable accretion mode with gravitational attraction
+      if (this.supernovaRemnant && this.blackHole) {
+        this.supernovaRemnant.enableAccretion(
+          new THREE.Vector3(0, 0, 0),  // Black hole at origin
+          0.15,                         // Accretion strength (3x stronger)
+          this.blackHole.getEventHorizonRadius()  // Match actual event horizon size
+        )
 
-          // Update remnant with new event horizon radius
-          const newRadius = this.blackHole.getEventHorizonRadius()
-          if (this.supernovaRemnant) {
-            this.supernovaRemnant.updateEventHorizonRadius(newRadius)
-          }
-        }
-      })
-    }
-
-    // Create accretion sources at various orbital positions (2x distance for longer spiral)
-    const sourcePositions = [
-      new THREE.Vector3(50, 30, 20),   // ~62 units from black hole
-      new THREE.Vector3(-44, -20, 36), // ~62 units from black hole
-      new THREE.Vector3(36, -40, -30), // ~62 units from black hole
-    ]
-
-    sourcePositions.forEach((pos) => {
-      const source = new AccretionSource(
-        this.scene,
-        pos,
-        0xff5500,  // Hot orange (accreting stellar matter)
-        0.15,      // Stronger gravitational pull (3x)
-        this.blackHole!.getEventHorizonRadius()  // Match actual event horizon size
-      )
-
-      // Wire up consumption callback to grow black hole
-      if (this.blackHole) {
-        source.setConsumptionCallback((mass) => {
+        // Set up particle consumption callback
+        this.supernovaRemnant.setConsumptionCallback((mass) => {
           if (this.blackHole) {
             this.blackHole.addMass(mass)
 
-            // Update all sources with new event horizon radius
+            // Update remnant with new event horizon radius
             const newRadius = this.blackHole.getEventHorizonRadius()
-            this.accretionSources.forEach(s => s.updateEventHorizonRadius(newRadius))
+            if (this.supernovaRemnant) {
+              this.supernovaRemnant.updateEventHorizonRadius(newRadius)
+            }
           }
         })
       }
 
-      this.accretionSources.push(source)
-    })
+      // Create accretion sources at various orbital positions (2x distance for longer spiral)
+      const sourcePositions = [
+        new THREE.Vector3(50, 30, 20),   // ~62 units from black hole
+        new THREE.Vector3(-44, -20, 36), // ~62 units from black hole
+        new THREE.Vector3(36, -40, -30), // ~62 units from black hole
+      ]
 
-    // Remove planets
+      sourcePositions.forEach((pos) => {
+        const source = new AccretionSource(
+          this.scene,
+          pos,
+          0xff5500,  // Hot orange (accreting stellar matter)
+          0.15,      // Stronger gravitational pull (3x)
+          this.blackHole!.getEventHorizonRadius()  // Match actual event horizon size
+        )
+
+        // Wire up consumption callback to grow black hole
+        if (this.blackHole) {
+          source.setConsumptionCallback((mass) => {
+            if (this.blackHole) {
+              this.blackHole.addMass(mass)
+
+              // Update all sources with new event horizon radius
+              const newRadius = this.blackHole.getEventHorizonRadius()
+              this.accretionSources.forEach(s => s.updateEventHorizonRadius(newRadius))
+            }
+          })
+        }
+
+        this.accretionSources.push(source)
+      })
+
+      // Update phase
+      this.currentPhase = SimulationPhase.BLACK_HOLE
+      this.lastDebugText = ''
+      if (this.debugRadiusElement) {
+        this.debugRadiusElement.textContent = ''
+      }
+      this.updatePhaseInfo(
+        'Phase 5: Black Hole',
+        'The core collapses into a singularity. Matter spirals into the accretion disk, warping spacetime itself. Nothing escapes.'
+      )
+    } else {
+      console.log('Collapsing into neutron star...')
+
+      // Create neutron star with camera reference
+      this.neutronStar = new NeutronStar(this.scene, this.camera)
+
+      // Remove star
+      if (this.star) {
+        this.star.dispose()
+        this.star = null
+      }
+
+      // Keep supernova remnant alive for accretion - particles will be pulled onto neutron star surface
+      // Enable accretion mode with gravitational attraction
+      if (this.supernovaRemnant && this.neutronStar) {
+        this.supernovaRemnant.enableAccretion(
+          new THREE.Vector3(0, 0, 0),  // Neutron star at origin
+          0.15,                         // Accretion strength
+          this.neutronStar.getSurfaceRadius()  // Match neutron star surface
+        )
+
+        // Set up particle consumption callback
+        this.supernovaRemnant.setConsumptionCallback((mass) => {
+          if (this.neutronStar) {
+            this.neutronStar.addMass(mass)
+
+            // Update remnant with new surface radius
+            const newRadius = this.neutronStar.getSurfaceRadius()
+            if (this.supernovaRemnant) {
+              this.supernovaRemnant.updateEventHorizonRadius(newRadius)
+            }
+          }
+        })
+      }
+
+      // Create accretion sources at various orbital positions
+      const sourcePositions = [
+        new THREE.Vector3(50, 30, 20),   // ~62 units from neutron star
+        new THREE.Vector3(-44, -20, 36), // ~62 units from neutron star
+        new THREE.Vector3(36, -40, -30), // ~62 units from neutron star
+      ]
+
+      sourcePositions.forEach((pos) => {
+        const source = new AccretionSource(
+          this.scene,
+          pos,
+          0x66aaff,  // Bluish white (accreting onto neutron star)
+          0.15,      // Stronger gravitational pull
+          this.neutronStar!.getSurfaceRadius()  // Match neutron star surface
+        )
+
+        // Wire up consumption callback to grow neutron star mass
+        if (this.neutronStar) {
+          source.setConsumptionCallback((mass) => {
+            if (this.neutronStar) {
+              this.neutronStar.addMass(mass)
+
+              // Update all sources with new surface radius
+              const newRadius = this.neutronStar.getSurfaceRadius()
+              this.accretionSources.forEach(s => s.updateEventHorizonRadius(newRadius))
+            }
+          })
+        }
+
+        this.accretionSources.push(source)
+      })
+
+      // Update phase
+      this.currentPhase = SimulationPhase.NEUTRON_STAR
+      this.lastDebugText = ''
+      if (this.debugRadiusElement) {
+        this.debugRadiusElement.textContent = ''
+      }
+      this.updatePhaseInfo(
+        'Phase 5: Neutron Star',
+        'The core collapses into an ultra-dense neutron star. Rotating at incredible speeds, magnetic fields create blazing pulsar beams that sweep across space like a cosmic lighthouse.'
+      )
+    }
+
+    // Remove planets (common to both paths)
     if (this.planetSystem) {
       this.planetSystem.dispose()
       this.planetSystem = null
     }
-
-    // Update phase
-    this.currentPhase = SimulationPhase.BLACK_HOLE
-    this.lastDebugText = ''
-    if (this.debugRadiusElement) {
-      this.debugRadiusElement.textContent = ''
-    }
-    this.updatePhaseInfo(
-      'Phase 5: Black Hole',
-      'The core collapses into a singularity. Matter spirals into the accretion disk, warping spacetime itself. Nothing escapes.'
-    )
   }
 
   private startTransitionToMainSequence(): void {
