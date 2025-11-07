@@ -1,5 +1,6 @@
 import * as THREE from 'three'
 import { SupernovaFlash } from './SupernovaFlash'
+import { Noise3D } from './utils/Noise'
 
 export class Star {
   private star!: THREE.Mesh
@@ -21,6 +22,12 @@ export class Star {
   private surfaceTextureCount: number = 2000
   private surfaceTexturePositions!: Float32Array
   private surfaceTextureBasePositions!: Float32Array // Store base positions for convection movement
+  private surfaceTextureCells!: Float32Array // Cell ID for each particle (for convection grouping)
+  private surfaceTextureColors!: Float32Array // Per-particle colors for cell visualization
+
+  // Convection cell parameters
+  private readonly cellNoiseFrequency: number = 0.3 // Low frequency = large cells (~4 unit diameter)
+  private readonly numConvectionCells: number = 18 // Betelgeuse-scale: ~15-20 massive cells
 
   // Surface activity
   private surfaceParticles!: THREE.Points
@@ -42,7 +49,7 @@ export class Star {
   // Red giant expansion state
   private isRedGiant: boolean = false
   private redGiantRadius: number = 25.0 // Massive red giant size
-  private expansionDuration: number = 8.0 // 8 seconds to expand
+  private expansionDuration: number = 24.0 // 24 seconds to expand (3x longer for demo)
   private expansionTime: number = 0
   private expansionStartRadius: number = 4.0
   private irregularPulseOffset: number = 0 // Random variation in pulsing
@@ -105,6 +112,8 @@ export class Star {
     this.surfaceTextureGeometry = new THREE.BufferGeometry()
     this.surfaceTexturePositions = new Float32Array(this.surfaceTextureCount * 3)
     this.surfaceTextureBasePositions = new Float32Array(this.surfaceTextureCount * 3)
+    this.surfaceTextureCells = new Float32Array(this.surfaceTextureCount)
+    this.surfaceTextureColors = new Float32Array(this.surfaceTextureCount * 3)
 
     // Create particles on star surface for mottled texture
     for (let i = 0; i < this.surfaceTextureCount; i++) {
@@ -127,17 +136,34 @@ export class Star {
       this.surfaceTextureBasePositions[i3] = x
       this.surfaceTextureBasePositions[i3 + 1] = y
       this.surfaceTextureBasePositions[i3 + 2] = z
+
+      // Assign particle to convection cell using 3D noise
+      // Use spherical coordinates for coherent cell assignment
+      const noiseValue = Noise3D.noise(
+        theta * this.cellNoiseFrequency,
+        phi * this.cellNoiseFrequency,
+        0 // No time component yet - static cell assignment
+      )
+      this.surfaceTextureCells[i] = Noise3D.noiseToCell(noiseValue, this.numConvectionCells)
+
+      // Assign temperature-based colors (will be updated in animation loop)
+      // Initialize to mid-tone red-orange
+      const color = new THREE.Color(0xff5533)
+      this.surfaceTextureColors[i3] = color.r
+      this.surfaceTextureColors[i3 + 1] = color.g
+      this.surfaceTextureColors[i3 + 2] = color.b
     }
 
     this.surfaceTextureGeometry.setAttribute('position', new THREE.BufferAttribute(this.surfaceTexturePositions, 3))
+    this.surfaceTextureGeometry.setAttribute('color', new THREE.BufferAttribute(this.surfaceTextureColors, 3))
 
-    // Surface texture material - darker spots initially invisible
+    // Surface texture material - temperature-based convection cells
     this.surfaceTextureMaterial = new THREE.PointsMaterial({
-      size: 1.2,
-      color: 0x882200, // Dark red-brown for convection cells
+      size: 5.0, // Large enough to see cells clearly
+      vertexColors: true, // Use temperature-based per-particle colors
       transparent: true,
       opacity: 0.0, // Start invisible
-      blending: THREE.NormalBlending, // Not additive - want darker spots
+      blending: THREE.NormalBlending, // Normal blending so dark spots show
       depthWrite: false
     })
 
@@ -467,9 +493,12 @@ export class Star {
       // Animate surface texture particles - make them breathe and move with convection
       this.surfaceTextureMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.4, expansionProgress)
 
-      // Update each surface texture particle position for convection movement
+      // Update each surface texture particle position for NOISE-DRIVEN CELL convection
       const texturePositions = this.surfaceTextureGeometry.attributes.position.array as Float32Array
       const scaleFactor = (this.currentRadius / this.starRadius) * pulse // Breathe with the star
+
+      // Time evolution for churning cells - faster for visible movement
+      const slowTime = this.time * 0.25 // Increased from 0.08 for visible churning
 
       for (let i = 0; i < this.surfaceTextureCount; i++) {
         const i3 = i * 3
@@ -479,22 +508,55 @@ export class Star {
         const baseY = this.surfaceTextureBasePositions[i3 + 1]
         const baseZ = this.surfaceTextureBasePositions[i3 + 2]
 
-        // Add slow convection drift using multiple sine waves
-        const driftX = Math.sin(this.time * 0.1 + i * 0.5) * 0.3
-        const driftY = Math.cos(this.time * 0.12 + i * 0.7) * 0.3
-        const driftZ = Math.sin(this.time * 0.15 + i * 0.3) * 0.3
+        // Convert to spherical coordinates for noise sampling
+        const baseRadius = Math.sqrt(baseX * baseX + baseY * baseY + baseZ * baseZ)
+        const theta = Math.atan2(baseY, baseX)
+        const phi = Math.acos(baseZ / baseRadius)
 
-        // Apply scale and drift
-        texturePositions[i3] = (baseX + driftX) * scaleFactor
-        texturePositions[i3 + 1] = (baseY + driftY) * scaleFactor
-        texturePositions[i3 + 2] = (baseZ + driftZ) * scaleFactor
+        // Sample 3D noise for this cell (coherent across cell members)
+        // Add small per-particle offset to time so cells evolve at different rates
+        const particleTimeOffset = this.surfaceTextureCells[i] * 0.1
+        const noiseX = theta * this.cellNoiseFrequency
+        const noiseY = phi * this.cellNoiseFrequency
+        const noiseZ = slowTime + particleTimeOffset
+        const cellNoise = Noise3D.noise(noiseX, noiseY, noiseZ)
+
+        // Convert noise to radial pulsation (cells breathe in/out together)
+        // Scale displacement relative to current star size for visibility
+        // Map [0,1] noise to displacement as percentage of base radius
+        const displacementPercent = (cellNoise - 0.5) * 0.3 // ±15% of radius
+        const radialDisplacement = baseRadius * displacementPercent
+
+        // Apply radial displacement along normal direction
+        const normal = {
+          x: baseX / baseRadius,
+          y: baseY / baseRadius,
+          z: baseZ / baseRadius
+        }
+
+        const displacedX = baseX + normal.x * radialDisplacement
+        const displacedY = baseY + normal.y * radialDisplacement
+        const displacedZ = baseZ + normal.z * radialDisplacement
+
+        // Apply scale factor
+        texturePositions[i3] = displacedX * scaleFactor
+        texturePositions[i3 + 1] = displacedY * scaleFactor
+        texturePositions[i3 + 2] = displacedZ * scaleFactor
+
+        // Update particle color based on temperature (noise = convection upwelling)
+        // High noise (>0.5) = hot upwelling plasma (bright red-orange)
+        // Low noise (<0.5) = cool downflow (dark red-brown)
+        const hotColor = new THREE.Color(0xff4422) // Bright red-orange (hot for red giant)
+        const coolColor = new THREE.Color(0x441100) // Very dark red-brown (cool)
+        const cellColor = new THREE.Color().lerpColors(coolColor, hotColor, cellNoise)
+
+        this.surfaceTextureColors[i3] = cellColor.r
+        this.surfaceTextureColors[i3 + 1] = cellColor.g
+        this.surfaceTextureColors[i3 + 2] = cellColor.b
       }
 
       this.surfaceTextureGeometry.attributes.position.needsUpdate = true
-
-      // Also rotate slowly for additional movement
-      this.surfaceTexture.rotation.y += 0.0002
-      this.surfaceTexture.rotation.x += 0.0001
+      this.surfaceTextureGeometry.attributes.color.needsUpdate = true
     } else {
       // Hide surface texture for main sequence
       this.surfaceTextureMaterial.opacity = 0.0
