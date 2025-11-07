@@ -77,6 +77,12 @@ class SunSimulator {
     filmGrain: true,
     vignette: true,
     showDebugOverlay: false,
+    // Bloom controls
+    bloomStrength: 0.8,
+    bloomThreshold: 0.85,
+    bloomRadius: 0.4,
+    eventHorizonGlow: 2.0,
+    overrideBloom: false, // Flag to override dynamic bloom during supernova
   }
 
   // Debug overlay elements
@@ -511,6 +517,94 @@ class SunSimulator {
           break
       }
     })
+
+    // Bloom control sliders
+    const bloomStrengthSlider = document.getElementById('debug-bloom-strength') as HTMLInputElement
+    const bloomStrengthVal = document.getElementById('debug-bloom-strength-val')
+    if (bloomStrengthSlider && bloomStrengthVal) {
+      bloomStrengthSlider.addEventListener('input', () => {
+        this.debugState.bloomStrength = parseFloat(bloomStrengthSlider.value)
+        this.debugState.overrideBloom = true
+        bloomStrengthVal.textContent = this.debugState.bloomStrength.toFixed(2)
+        this.bloomPass.strength = this.debugState.bloomStrength
+      })
+    }
+
+    const bloomThresholdSlider = document.getElementById('debug-bloom-threshold') as HTMLInputElement
+    const bloomThresholdVal = document.getElementById('debug-bloom-threshold-val')
+    if (bloomThresholdSlider && bloomThresholdVal) {
+      bloomThresholdSlider.addEventListener('input', () => {
+        this.debugState.bloomThreshold = parseFloat(bloomThresholdSlider.value)
+        bloomThresholdVal.textContent = this.debugState.bloomThreshold.toFixed(2)
+        this.bloomPass.threshold = this.debugState.bloomThreshold
+      })
+    }
+
+    const bloomRadiusSlider = document.getElementById('debug-bloom-radius') as HTMLInputElement
+    const bloomRadiusVal = document.getElementById('debug-bloom-radius-val')
+    if (bloomRadiusSlider && bloomRadiusVal) {
+      bloomRadiusSlider.addEventListener('input', () => {
+        this.debugState.bloomRadius = parseFloat(bloomRadiusSlider.value)
+        bloomRadiusVal.textContent = this.debugState.bloomRadius.toFixed(2)
+        this.bloomPass.radius = this.debugState.bloomRadius
+      })
+    }
+
+    const ehGlowSlider = document.getElementById('debug-eh-glow') as HTMLInputElement
+    const ehGlowVal = document.getElementById('debug-eh-glow-val')
+    if (ehGlowSlider && ehGlowVal) {
+      ehGlowSlider.addEventListener('input', () => {
+        this.debugState.eventHorizonGlow = parseFloat(ehGlowSlider.value)
+        ehGlowVal.textContent = this.debugState.eventHorizonGlow.toFixed(2)
+        // Apply to black hole if it exists
+        if (this.blackHole) {
+          this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
+        }
+      })
+    }
+
+    // Reset bloom controls button
+    const bloomResetBtn = document.getElementById('debug-bloom-reset')
+    if (bloomResetBtn) {
+      bloomResetBtn.addEventListener('click', () => {
+        // Reset to defaults
+        this.debugState.bloomStrength = 0.8
+        this.debugState.bloomThreshold = 0.85
+        this.debugState.bloomRadius = 0.4
+        this.debugState.eventHorizonGlow = 2.0
+        this.debugState.overrideBloom = false
+
+        // Update sliders and displays
+        if (bloomStrengthSlider && bloomStrengthVal) {
+          bloomStrengthSlider.value = '0.8'
+          bloomStrengthVal.textContent = '0.80'
+        }
+        if (bloomThresholdSlider && bloomThresholdVal) {
+          bloomThresholdSlider.value = '0.85'
+          bloomThresholdVal.textContent = '0.85'
+        }
+        if (bloomRadiusSlider && bloomRadiusVal) {
+          bloomRadiusSlider.value = '0.4'
+          bloomRadiusVal.textContent = '0.40'
+        }
+        if (ehGlowSlider && ehGlowVal) {
+          ehGlowSlider.value = '2.0'
+          ehGlowVal.textContent = '2.00'
+        }
+
+        // Apply to bloom pass
+        this.bloomPass.strength = 0.8
+        this.bloomPass.threshold = 0.85
+        this.bloomPass.radius = 0.4
+
+        // Apply to black hole if it exists
+        if (this.blackHole) {
+          this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = 2.0
+        }
+
+        console.log('[DEBUG] Bloom controls reset to defaults')
+      })
+    }
   }
 
   private animate(): void {
@@ -559,8 +653,8 @@ class SunSimulator {
       }
     }
 
-    // Dynamic bloom intensity based on supernova flash
-    if (this.star) {
+    // Dynamic bloom intensity based on supernova flash (unless manually overridden)
+    if (this.star && !this.debugState.overrideBloom) {
       const shakeIntensity = this.star.getCameraShakeIntensity()
       // Bloom gets INSANE during supernova (0.8 base → 3.5 peak)
       this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 3.5, shakeIntensity)
@@ -721,6 +815,11 @@ class SunSimulator {
 
     // Create black hole with camera reference for shader effects
     this.blackHole = new BlackHole(this.scene, this.camera)
+
+    // Apply debug glow intensity if set
+    if (this.blackHole) {
+      this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
+    }
 
     // Remove star
     if (this.star) {

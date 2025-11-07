@@ -83,6 +83,29 @@
           <div>Total: <span id="debug-total-particles">--</span></div>
         </div>
 
+        <div style="margin-bottom: 8px;">
+          <div style="color: #888; display: flex; justify-content: space-between; align-items: center;">
+            <span>--- BLOOM ---</span>
+            <button id="debug-bloom-reset" style="font-size: 9px; padding: 2px 6px; background: rgba(0,255,0,0.1); border: 1px solid #0f0; color: #0f0; cursor: pointer; font-family: 'Courier New', monospace;">RESET</button>
+          </div>
+          <div style="font-size: 10px; margin-bottom: 4px;">
+            Strength: <span id="debug-bloom-strength-val">0.80</span>
+            <input type="range" id="debug-bloom-strength" min="0" max="5" step="0.1" value="0.8" class="debug-slider">
+          </div>
+          <div style="font-size: 10px; margin-bottom: 4px;">
+            Threshold: <span id="debug-bloom-threshold-val">0.85</span>
+            <input type="range" id="debug-bloom-threshold" min="0" max="1" step="0.05" value="0.85" class="debug-slider">
+          </div>
+          <div style="font-size: 10px; margin-bottom: 4px;">
+            Radius: <span id="debug-bloom-radius-val">0.40</span>
+            <input type="range" id="debug-bloom-radius" min="0" max="2" step="0.1" value="0.4" class="debug-slider">
+          </div>
+          <div style="font-size: 10px; margin-bottom: 4px;">
+            EH Glow: <span id="debug-eh-glow-val">2.00</span>
+            <input type="range" id="debug-eh-glow" min="0" max="20" step="0.5" value="2.0" class="debug-slider">
+          </div>
+        </div>
+
         <div style="margin-top: 10px; padding-top: 8px; border-top: 1px solid #0f0;">
           <div style="color: #888;">--- TOGGLES ---</div>
           <div style="font-size: 10px; line-height: 1.4;">
