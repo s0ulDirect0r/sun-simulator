@@ -61,6 +61,7 @@ class SunSimulator {
   private isPaused: boolean = true // Start paused until user clicks "Begin Simulation"
   private timeScale: number = 1.0
   private simulationStarted: boolean = false // Track if simulation has started
+  private isCameraLocked: boolean = true // Start locked during nebula
 
   // Debug state for toggling visual elements
   private debugState = {
@@ -528,8 +529,14 @@ class SunSimulator {
     // Update controls
     this.controls.update()
 
-    // Apply camera shake during supernova
-    if (this.star) {
+    // Update camera base position for transitions
+    // When camera is free, track the actual camera position for smooth lock transitions
+    if (!this.isCameraLocked) {
+      this.cameraBasePosition.copy(this.camera.position)
+    }
+
+    // Apply camera shake during supernova (only when locked)
+    if (this.star && this.isCameraLocked) {
       const shakeIntensity = this.star.getCameraShakeIntensity()
       if (shakeIntensity > 0) {
         // Apply shake offset
@@ -538,7 +545,7 @@ class SunSimulator {
         this.camera.position.y = this.cameraBasePosition.y + (Math.random() - 0.5) * shakeAmount
         this.camera.position.z = this.cameraBasePosition.z + (Math.random() - 0.5) * shakeAmount * 0.3
       } else {
-        // Reset to base position when no shake
+        // Reset to base position when no shake (only when locked)
         this.camera.position.copy(this.cameraBasePosition)
       }
     }
@@ -692,6 +699,13 @@ class SunSimulator {
     // Update phase
     this.currentPhase = SimulationPhase.SUPERNOVA
     this.supernovaTimer = 0
+    this.isCameraLocked = true // LOCK CAMERA - dramatic supernova needs fixed viewpoint
+    // Reset camera to optimal viewing position for supernova
+    this.camera.position.set(0, 0, 50)
+    this.cameraBasePosition.set(0, 0, 50)
+    // Reset camera target to look at center
+    this.controls.target.set(0, 0, 0)
+    this.controls.update()
     this.lastDebugText = ''
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
@@ -777,6 +791,7 @@ class SunSimulator {
 
     // Update phase
     this.currentPhase = SimulationPhase.BLACK_HOLE
+    this.isCameraLocked = true // Keep camera locked for black hole phase
     this.lastDebugText = ''
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
@@ -852,6 +867,7 @@ class SunSimulator {
 
     // Update phase
     this.currentPhase = SimulationPhase.MAIN_SEQUENCE
+    this.isCameraLocked = false // FREE CAMERA - user can explore the star
     this.lastDebugText = ''
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
