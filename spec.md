@@ -51,8 +51,11 @@ A web-based interactive simulation that visualizes the complete lifecycle of a s
   - Expanding nebula of ejected material
 - **Duration**: Dramatic, high-energy sequence
 
-### Phase 5: Black Hole Formation and Accretion
-- **Process**: Supernova remnant collapses into a singularity with event horizon
+### Phase 5: Stellar Remnant Formation (Random: Black Hole OR Neutron Star)
+- **Process**: 50/50 random selection determines remnant type - adds spontaneity to each simulation run!
+- **Duration**: Continuous accretion process, demonstrates remnant dynamics
+
+#### Black Hole Branch:
 - **Visual Elements**:
   - **Event Horizon**: Shader-based spacetime distortion with gravitational warping
   - **Accretion Disk**: Ring of superheated material with temperature-based color gradients (blue-white core → orange → red edges)
@@ -65,7 +68,21 @@ A web-based interactive simulation that visualizes the complete lifecycle of a s
   - Innermost Stable Circular Orbit (ISCO) at 3× Schwarzschild radius
   - Jet collimation (20-50% of event horizon radius)
   - Blandford-Znajek process (energy extraction via magnetic fields)
-- **Duration**: Continuous accretion process, demonstrates black hole dynamics
+
+#### Neutron Star Branch:
+- **Visual Elements**:
+  - **Ultra-Dense Surface**: Tiny (~1.5 units), incredibly bright bluish-white sphere
+  - **Pulsar Beams**: Rotating lighthouse effect with narrow, intense beams along magnetic poles
+  - **Magnetic Field Lines**: Curved cyan field lines emanating from poles
+  - **Rapid Rotation**: 30 rotations per second (millisecond pulsar)
+  - **Surface Hotspots**: Rotating accretion points where material impacts surface
+  - **Accretion Streams**: Bluish-white particles spiraling onto neutron star surface
+  - **Mass Growth**: Slight radius increase with accretion (limited to ~2.5 solar masses)
+- **Physics Inspiration**:
+  - Millisecond pulsar rotation periods
+  - Magnetic axis offset from rotation axis
+  - Surface accretion (vs black hole event horizon consumption)
+  - Neutron star mass limits (Tolman-Oppenheimer-Volkoff limit)
 
 ## Technical Requirements
 
@@ -165,25 +182,43 @@ A web-based interactive simulation that visualizes the complete lifecycle of a s
 
 ### ✅ Completed Features
 
-**Black Hole Core (Phase 5):**
-- Event horizon with shader-based spacetime distortion
-- Accretion disk with temperature gradients and rotation
-- Dynamic accretion streams (3 sources) with spiral orbital motion
-- Shader-based relativistic jets with flowing effects
-- Mass-based scaling (jets and event horizon grow with consumption)
-- Formation animations (4-second fade-in)
+**Phase 5: Random Stellar Remnants:**
+- **50/50 Random Selection**: Each simulation run randomly creates either a black hole OR neutron star
+- **Black Hole Implementation**:
+  - Event horizon with shader-based spacetime distortion
+  - Accretion disk with temperature gradients and rotation
+  - Dynamic accretion streams (3 sources) with spiral orbital motion
+  - Shader-based relativistic jets with flowing effects
+  - Mass-based scaling (jets and event horizon grow with consumption)
+  - Formation animations (4-second fade-in)
+- **Neutron Star Implementation** (NEW):
+  - Ultra-dense surface with custom shader (bluish-white, 1.5 unit radius)
+  - Rotating pulsar beams with lighthouse effect
+  - Magnetic field line visualization (12 curved lines)
+  - Millisecond pulsar rotation (30 rotations/second)
+  - Surface hotspot lights for accretion visualization
+  - Mass growth with TOV limit enforcement (~2.5 solar masses)
 
 **Technical Implementation:**
-- Custom GLSL shaders (EventHorizonShader, AccretionDiskShader, JetTrailShader)
+- Custom GLSL shaders (EventHorizonShader, AccretionDiskShader, JetTrailShader, NeutronStar surface shader, Pulsar beam shader)
 - Particle systems with Keplerian orbital mechanics
 - Real-time physics integration (gravity, angular momentum)
-- Mass tracking and growth system
+- Mass tracking and growth system for both remnant types
 - Additive blending for luminous effects
+- Phase enum with NEUTRON_STAR state
+- Debug overlay support for neutron star stats
+
+**Testing:**
+- Playwright E2E tests to verify random remnant selection
+- Multiple-run tests to confirm randomness (50/50 distribution)
+- Visual element verification tests
+- Console log verification for both branches
 
 **Performance:**
 - 60fps stable with 3000+ active particles
 - Shader-based rendering for complex effects
 - Optimized particle lifecycle management
+- Neutron star adds minimal overhead (small geometry, efficient shaders)
 
 ### 🚧 In Progress
 
