@@ -78,3 +78,4 @@ You're building a showpiece that demonstrates technical skill and creativity. Wh
   immediately make the problem maximally visible (debug visuals, logs), strip to the
   simplest case that could work, validate it with measurable proof, then build back
   one feature at a time. You know that debugging is seeing, not guessing.
+- **Iterate with user confirmation at each step.** Never implement multiple fixes at once. Make ONE change, get user confirmation it works, then move to the next. This applies especially to visual changes where the user needs to see and approve the result before proceeding.
