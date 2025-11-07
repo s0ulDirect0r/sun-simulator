@@ -247,6 +247,35 @@ export class BlackHole {
     return this.currentMass
   }
 
+  public setScale(scale: number): void {
+    // Uniformly scale all black hole elements (for emergence from singularity)
+    this.eventHorizon.scale.setScalar(scale)
+    this.accretionDisk.scale.setScalar(scale)
+    this.lensingRing.scale.setScalar(scale)
+    this.jetTop.scale.set(scale, scale, scale)
+    this.jetBottom.scale.set(scale, scale, scale)
+  }
+
+  public setOpacity(opacity: number): void {
+    // Manual opacity control - bypass formation animation
+    this.isForming = false
+    this.formationProgress = opacity
+
+    // Apply to all black hole elements
+    this.eventHorizonMaterial.opacity = opacity * 1.0
+    this.eventHorizonMaterial.uniforms.glowIntensity.value = opacity * 8.0
+
+    const lensingMaterial = this.lensingRing.material as THREE.MeshBasicMaterial
+    lensingMaterial.opacity = opacity * 0.6
+
+    // Accretion disk opacity via shader uniform
+    this.accretionDiskMaterial.uniforms.globalOpacity.value = opacity * 1.0
+
+    // Jets opacity via shader uniforms
+    this.jetMaterial.uniforms.opacity.value = opacity * 0.8
+    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = opacity * 0.8
+  }
+
   public dispose(): void {
     this.eventHorizon.geometry.dispose()
     this.eventHorizonMaterial.dispose()

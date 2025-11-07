@@ -67,6 +67,12 @@ export class Star {
   private shockwaveMaterial!: THREE.MeshBasicMaterial
   private supernovaFlash: SupernovaFlash | null = null
 
+  // Core collapse state (physically accurate: happens at supernova start)
+  private isCollapsing: boolean = false
+  private collapseTime: number = 0
+  private collapseDuration: number = 2.0 // 2 seconds for core to collapse to singularity
+  private collapseStartScale: number = 1.0
+
   constructor(scene: THREE.Scene, initialRadius: number = 4.8) {
     this.initialRadius = initialRadius
     this.currentRadius = initialRadius // Start at whatever size the protostar was
@@ -311,6 +317,20 @@ export class Star {
 
   public update(deltaTime: number): void {
     this.time += deltaTime
+
+    // Handle core collapse (happens during supernova, t=0-2s)
+    if (this.isCollapsing && this.collapseTime < this.collapseDuration) {
+      this.collapseTime += deltaTime
+      const collapseProgress = Math.min(this.collapseTime / this.collapseDuration, 1.0)
+
+      // Shrink star scale from start → 0 (implosion)
+      const targetScale = THREE.MathUtils.lerp(this.collapseStartScale, 0, collapseProgress)
+      this.star.scale.setScalar(targetScale)
+
+      if (collapseProgress >= 1.0) {
+        console.log('[COLLAPSE] Core collapsed to singularity')
+      }
+    }
 
     // Handle supernova explosion
     if (this.isSupernova) {
@@ -632,11 +652,23 @@ export class Star {
     return this.isRedGiant
   }
 
+  public startCollapse(): void {
+    if (this.isCollapsing) return // Already collapsing
+
+    this.isCollapsing = true
+    this.collapseTime = 0
+    this.collapseStartScale = this.star.scale.x // Capture current scale
+    console.log(`[COLLAPSE] Core collapse initiated! Starting scale: ${this.collapseStartScale.toFixed(2)}`)
+  }
+
   public startSupernova(): void {
     if (this.isSupernova) return // Already exploding
 
     this.isSupernova = true
     this.supernovaTime = 0
+
+    // Trigger core collapse simultaneously (physically accurate)
+    this.startCollapse()
 
     // Hide red giant volumetric layers
     const innerMaterial = this.redGiantInnerLayer.material as THREE.MeshBasicMaterial

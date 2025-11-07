@@ -748,10 +748,28 @@ class SunSimulator {
         if (this.star) {
           this.star.update(deltaTime)
 
-          // Track supernova duration and trigger black hole
+          // Track supernova duration
           this.supernovaTimer += deltaTime
+
+          // Update black hole (present from t=0)
+          if (this.blackHole) {
+            this.blackHole.update(deltaTime)
+
+            // Grow black hole during core collapse (t=0-2s)
+            if (this.supernovaTimer <= 2.0) {
+              const growthProgress = this.supernovaTimer / 2.0
+              this.blackHole.setScale(growthProgress) // 0 → 1
+              this.blackHole.setOpacity(growthProgress) // 0 → 1
+            } else {
+              // Ensure fully grown after 2s
+              this.blackHole.setScale(1.0)
+              this.blackHole.setOpacity(1.0)
+            }
+          }
+
+          // Transition to black hole phase when supernova ends
           if (this.supernovaTimer >= this.supernovaDuration) {
-            this.startBlackHole()
+            this.completeBlackHoleTransition()
           }
         }
         break
@@ -800,6 +818,12 @@ class SunSimulator {
       this.supernovaRemnant = new SupernovaRemnant(this.scene, currentStarRadius)
     }
 
+    // Create black hole immediately (physically accurate: forms during core collapse)
+    this.blackHole = new BlackHole(this.scene, this.camera)
+    this.blackHole.setScale(0) // Start at singularity point
+    this.blackHole.setOpacity(0) // Start invisible
+    console.log('[BLACK HOLE] Formation begins at singularity')
+
     // Hide planets during supernova
     if (this.planetSystem) {
       this.planetSystem.hide()
@@ -825,18 +849,13 @@ class SunSimulator {
     )
   }
 
-  private startBlackHole(): void {
-    console.log('Collapsing into black hole...')
+  private completeBlackHoleTransition(): void {
+    console.log('[BLACK HOLE] Transition complete - entering black hole phase')
 
-    // Create black hole with camera reference for shader effects
-    this.blackHole = new BlackHole(this.scene, this.camera)
+    // Black hole already exists and is fully formed (created at t=0, grown during t=0-2s)
+    // Now set up accretion and transition to BLACK_HOLE phase
 
-    // Apply debug glow intensity if set
-    if (this.blackHole) {
-      this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
-    }
-
-    // Remove star
+    // Remove star (core has collapsed)
     if (this.star) {
       this.star.dispose()
       this.star = null
