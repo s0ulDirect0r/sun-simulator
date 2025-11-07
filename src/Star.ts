@@ -19,8 +19,8 @@ export class Star {
   private coronaFadeOutDuration: number = 3.0 // Fade out over 3 seconds during red giant start
   private coronaFadeOutTime: number = 0
 
-  // Surface texture particles for mottled appearance
-  private surfaceTexture!: THREE.Points
+  // Surface texture particles for mottled appearance (public for debug toggles)
+  public surfaceTexture!: THREE.Points
   private surfaceTextureGeometry!: THREE.BufferGeometry
   private surfaceTextureMaterial!: THREE.PointsMaterial
   private surfaceTextureCount: number = 2000
@@ -33,13 +33,16 @@ export class Star {
   private readonly cellNoiseFrequency: number = 0.3 // Low frequency = large cells (~4 unit diameter)
   private readonly numConvectionCells: number = 18 // Betelgeuse-scale: ~15-20 massive cells
 
-  // Surface activity
-  private surfaceParticles!: THREE.Points
+  // Surface activity (public for debug toggles)
+  public surfaceParticles!: THREE.Points
   private surfaceGeometry!: THREE.BufferGeometry
-  private surfaceMaterial!: THREE.PointsMaterial
+  private surfaceMaterial!: THREE.ShaderMaterial // Custom shader for per-particle sizes
   private surfaceCount: number = 900 // Balanced stellar wind
   private surfacePositions!: Float32Array
   private surfaceVelocities!: Float32Array
+  private surfaceSizes!: Float32Array // Per-particle size for growth effect (rendered size)
+  private surfaceBaseSizes!: Float32Array // Original spawn sizes (never modified, used for growth calculation)
+  private surfaceColors!: Float32Array // Per-particle colors (RGB, fades with distance)
 
   private starRadius: number = 4.0 // Main sequence star - compact and stable
   private initialRadius: number // Start size (from protostar)
@@ -57,6 +60,7 @@ export class Star {
   private expansionTime: number = 0
   private expansionStartRadius: number = 4.0
   private irregularPulseOffset: number = 0 // Random variation in pulsing
+  private currentPulse: number = 1.0 // Current breathing pulse value (1.0 = baseline)
 
   // Red giant volumetric layers for depth effect (public for debug toggles)
   public redGiantInnerLayer!: THREE.Mesh
@@ -283,6 +287,9 @@ export class Star {
     this.surfaceGeometry = new THREE.BufferGeometry()
     this.surfacePositions = new Float32Array(this.surfaceCount * 3)
     this.surfaceVelocities = new Float32Array(this.surfaceCount * 3)
+    this.surfaceSizes = new Float32Array(this.surfaceCount)
+    this.surfaceBaseSizes = new Float32Array(this.surfaceCount) // Original sizes, never modified
+    this.surfaceColors = new Float32Array(this.surfaceCount * 3) // RGB per particle
 
     // Create particles on star surface
     for (let i = 0; i < this.surfaceCount; i++) {
@@ -301,16 +308,57 @@ export class Star {
       this.surfaceVelocities[i3] = this.surfacePositions[i3] / this.starRadius * speed
       this.surfaceVelocities[i3 + 1] = this.surfacePositions[i3 + 1] / this.starRadius * speed
       this.surfaceVelocities[i3 + 2] = this.surfacePositions[i3 + 2] / this.starRadius * speed
+
+      // Initialize base size (will grow with distance during red giant)
+      const baseSize = 0.3 + Math.random() * 0.3 // 0.3-0.6 base size
+      this.surfaceSizes[i] = baseSize
+      this.surfaceBaseSizes[i] = baseSize // Store original size for growth calculations
+
+      // Initialize color (will fade with distance during red giant)
+      this.surfaceColors[i3] = 1.0     // R
+      this.surfaceColors[i3 + 1] = 0.6 // G (orange-ish)
+      this.surfaceColors[i3 + 2] = 0.2 // B
     }
 
     this.surfaceGeometry.setAttribute('position', new THREE.BufferAttribute(this.surfacePositions, 3))
+    this.surfaceGeometry.setAttribute('size', new THREE.BufferAttribute(this.surfaceSizes, 1))
+    this.surfaceGeometry.setAttribute('color', new THREE.BufferAttribute(this.surfaceColors, 3))
 
-    // Surface activity material - orange-yellow stellar wind
-    this.surfaceMaterial = new THREE.PointsMaterial({
-      size: 0.4, // Smaller particles
-      color: 0xff9922, // Keep original orange-yellow
+    // Custom shader material for per-particle sizes and colors
+    this.surfaceMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        opacity: { value: 1.0 }
+      },
+      vertexShader: `
+        attribute float size;
+        attribute vec3 color;
+        varying float vSize;
+        varying vec3 vColor;
+
+        void main() {
+          vSize = size;
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z); // Size attenuation
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform float opacity;
+        varying vec3 vColor;
+
+        void main() {
+          // Circular point shape
+          vec2 center = gl_PointCoord - vec2(0.5);
+          float dist = length(center);
+          if (dist > 0.5) discard;
+
+          // Soft edge
+          float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
+          gl_FragColor = vec4(vColor, alpha * opacity);
+        }
+      `,
       transparent: true,
-      opacity: 1.0, // Full brightness
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -384,14 +432,29 @@ export class Star {
       }
 
       // Make explosion particles bright white during flash, then blue
+      const shaderMaterial = this.surfaceMaterial as THREE.ShaderMaterial
+      const colors = this.surfaceGeometry.attributes.color.array as Float32Array
+
       if (supernovaProgress < 0.1) {
-        this.surfaceMaterial.color.set(0xffffff) // Pure white during flash
-        this.surfaceMaterial.opacity = 1.0
-        this.surfaceMaterial.size = 0.8 // Bigger particles during flash
+        // Pure white during flash
+        for (let i = 0; i < this.surfaceCount; i++) {
+          const i3 = i * 3
+          colors[i3] = 1.0
+          colors[i3 + 1] = 1.0
+          colors[i3 + 2] = 1.0
+        }
+        this.surfaceGeometry.attributes.color.needsUpdate = true
+        shaderMaterial.uniforms.opacity.value = 1.0
       } else {
-        this.surfaceMaterial.color.set(0xaaccff) // Blue after flash
-        this.surfaceMaterial.opacity = THREE.MathUtils.lerp(1.0, 0.3, (supernovaProgress - 0.1) / 0.9)
-        this.surfaceMaterial.size = 0.4 // Back to normal
+        // Blue after flash
+        for (let i = 0; i < this.surfaceCount; i++) {
+          const i3 = i * 3
+          colors[i3] = 0.67    // R (blue-ish)
+          colors[i3 + 1] = 0.8 // G
+          colors[i3 + 2] = 1.0 // B
+        }
+        this.surfaceGeometry.attributes.color.needsUpdate = true
+        shaderMaterial.uniforms.opacity.value = THREE.MathUtils.lerp(1.0, 0.3, (supernovaProgress - 0.1) / 0.9)
       }
     }
 
@@ -438,6 +501,8 @@ export class Star {
     } else {
       pulse = Math.sin(this.time * pulseFrequency) * pulseAmplitude + 1
     }
+
+    this.currentPulse = pulse // Store for stellar wind modulation
 
     const targetScale = (this.currentRadius / this.starRadius) * pulse
     this.star.scale.setScalar(targetScale)
@@ -607,11 +672,38 @@ export class Star {
     const positions = this.surfaceGeometry.attributes.position.array as Float32Array
     const velocities = this.surfaceVelocities
 
-    // Red giants have slower, more chaotic stellar wind
-    const velocityScale = this.isRedGiant ? 0.7 : 1.0 // Slower for red giants
+    // Red giants need faster wind to reach far distances during limited phase duration
+    const velocityScale = this.isRedGiant ? 0.8 : 1.0 // Faster than before to show growth
 
     for (let i = 0; i < this.surfaceCount; i++) {
       const i3 = i * 3
+
+      // Add tangential drift for red giants (creates wispy streamers)
+      if (this.isRedGiant && !this.isSupernova) {
+        // Calculate radial direction
+        const px = positions[i3]
+        const py = positions[i3 + 1]
+        const pz = positions[i3 + 2]
+        const dist = Math.sqrt(px * px + py * py + pz * pz)
+
+        if (dist > 0.1) {
+          const radialX = px / dist
+          const radialZ = pz / dist
+
+          // Tangential direction (perpendicular to radial, in XZ plane)
+          const tangentX = -radialZ
+          const tangentZ = radialX
+          const tangentLength = Math.sqrt(tangentX * tangentX + tangentZ * tangentZ)
+
+          if (tangentLength > 0.001) {
+            // Apply gentle tangential drift (creates curved paths)
+            // Modulate drift with breathing pulse
+            const driftStrength = 0.0002 * this.currentPulse
+            velocities[i3] += (tangentX / tangentLength) * driftStrength
+            velocities[i3 + 2] += (tangentZ / tangentLength) * driftStrength
+          }
+        }
+      }
 
       // Update positions with velocity scaling
       positions[i3] += velocities[i3] * velocityScale
@@ -625,9 +717,32 @@ export class Star {
         positions[i3 + 2] ** 2
       )
 
-      // Reset particles that go too far (continuous stellar wind) - let them travel MUCH further
+      // Update particle size and color based on distance (red giants only)
+      if (this.isRedGiant && !this.isSupernova) {
+        const sizes = this.surfaceGeometry.attributes.size.array as Float32Array
+        const colors = this.surfaceGeometry.attributes.color.array as Float32Array
+
+        // Use the particle's ORIGINAL spawn size (never modified)
+        const baseSize = this.surfaceBaseSizes[i]
+        const distanceRatio = (distance / this.currentRadius) / 28.0 // 0-1 over max distance
+
+        // Fade in size growth with expansion (0 at start -> 19.0 at full expansion = 20x size)
+        const currentExpansionProgress = Math.min(this.expansionTime / this.expansionDuration, 1.0)
+        const sizeGrowth = 19.0 * currentExpansionProgress
+
+        sizes[i] = baseSize * (1.0 + distanceRatio * sizeGrowth)
+
+        // Fade color with distance (bright near star, very dark far away)
+        const brightness = 1.0 - distanceRatio * 0.9 // Fade to 10% at max distance (more dramatic)
+        colors[i3] = 1.0 * brightness      // R
+        colors[i3 + 1] = 0.6 * brightness  // G (orange)
+        colors[i3 + 2] = 0.2 * brightness  // B
+      }
+
+      // Reset particles that go too far (continuous stellar wind) - let them travel MUCH further for fuzzy boundary
       // DON'T reset during supernova - let them fly away forever
-      if (!this.isSupernova && distance > this.currentRadius * 15) { // Scale with current star size
+      const maxDistance = this.isRedGiant ? 28 : 15 // Red giants: wisps travel much further
+      if (!this.isSupernova && distance > this.currentRadius * maxDistance) { // Scale with current star size
         const theta = Math.random() * Math.PI * 2
         const phi = Math.acos(2 * Math.random() - 1)
 
@@ -637,9 +752,9 @@ export class Star {
         positions[i3 + 1] = spawnRadius * Math.sin(phi) * Math.sin(theta)
         positions[i3 + 2] = spawnRadius * Math.cos(phi)
 
-        // Red giants have slower but more abundant mass loss
-        const baseSpeed = this.isRedGiant ? 0.02 : 0.03
-        const speedVariation = this.isRedGiant ? 0.05 : 0.08
+        // Red giants have much slower, gentle stellar wind (visible wisps near surface)
+        const baseSpeed = this.isRedGiant ? 0.01 : 0.03
+        const speedVariation = this.isRedGiant ? 0.02 : 0.08
         const speed = baseSpeed + Math.random() * speedVariation
 
         velocities[i3] = (positions[i3] / spawnRadius) * speed
@@ -648,15 +763,11 @@ export class Star {
       }
     }
 
-    // Update stellar wind particle color for red giants (unless supernova - handled above)
-    if (this.isRedGiant && !this.isSupernova) {
-      const orangeColor = new THREE.Color(0xff9922)
-      const redColor = new THREE.Color(0xff4422)
-      const blendedColor = new THREE.Color().lerpColors(orangeColor, redColor, expansionProgress * 0.7)
-      this.surfaceMaterial.color.copy(blendedColor)
-    }
-
     this.surfaceGeometry.attributes.position.needsUpdate = true
+    if (this.isRedGiant && !this.isSupernova) {
+      this.surfaceGeometry.attributes.size.needsUpdate = true
+      this.surfaceGeometry.attributes.color.needsUpdate = true
+    }
   }
 
   public startRedGiantExpansion(): void {
@@ -665,6 +776,7 @@ export class Star {
     this.isRedGiant = true
     this.expansionTime = 0
     this.expansionStartRadius = this.currentRadius
+
     console.log('Red giant expansion initiated!')
   }
 
