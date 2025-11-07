@@ -54,7 +54,7 @@ class SunSimulator {
   private mainSequenceTimer: number = 0
   private mainSequenceDuration: number = 30.0 // 30 seconds in main sequence before red giant
   private redGiantTimer: number = 0
-  private redGiantDuration: number = 15.0 // 15 seconds in red giant before supernova
+  private redGiantDuration: number = 45.0 // 45 seconds total: 24s expansion + 21s stable red giant before supernova
   private supernovaTimer: number = 0
   private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
   private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)

@@ -34,6 +34,7 @@ This is a creative technical project, not a research simulation. Your goal is to
 - Leverage post-processing (bloom, glow, lens flares) for visual drama
 - Prioritize smooth animation and transitions over simulation accuracy
 - Keep UI minimal and clean - let the visuals dominate
+- **Use proven libraries for standard algorithms** (noise, math utilities, etc.) - don't reinvent the wheel. Time spent debugging homegrown implementations of well-solved problems is wasted when demo day is tomorrow.
 
 ### Visual Continuity Rule (CRITICAL)
 **All visual elements MUST fade in/out during phase transitions. NEVER abruptly dispose or hide objects.**
