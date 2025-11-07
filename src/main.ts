@@ -58,8 +58,9 @@ class SunSimulator {
   private supernovaTimer: number = 0
   private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
   private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
-  private isPaused: boolean = false
+  private isPaused: boolean = true // Start paused until user clicks "Begin Simulation"
   private timeScale: number = 1.0
+  private simulationStarted: boolean = false // Track if simulation has started
 
   // Debug state for toggling visual elements
   private debugState = {
@@ -343,10 +344,39 @@ class SunSimulator {
   }
 
   private setupControls(): void {
+    // Start button
+    const startBtn = document.getElementById('btn-start')
+    const startScreen = document.getElementById('start-screen')
+    if (startBtn && startScreen) {
+      startBtn.addEventListener('click', () => {
+        // Hide start screen with fade-out animation
+        startScreen.classList.add('hidden')
+
+        // Start the simulation after fade-out animation completes
+        setTimeout(() => {
+          this.simulationStarted = true
+          this.isPaused = false
+          // Reset clock to avoid accumulated delta time
+          this.clock.getDelta()
+          if (playPauseBtn) {
+            playPauseBtn.textContent = '⏸️ Pause'
+          }
+          // Remove from DOM after animation
+          startScreen.remove()
+        }, 500) // Match fade-out animation duration
+      })
+    }
+
     // Play/Pause button
     const playPauseBtn = document.getElementById('btn-play-pause')
     if (playPauseBtn) {
+      // Set initial text to "Play" since we start paused
+      playPauseBtn.textContent = '▶️ Play'
+
       playPauseBtn.addEventListener('click', () => {
+        // Only allow pause/play after simulation has started
+        if (!this.simulationStarted) return
+
         this.isPaused = !this.isPaused
         playPauseBtn.textContent = this.isPaused ? '▶️ Play' : '⏸️ Pause'
       })
@@ -537,6 +567,11 @@ class SunSimulator {
   }
 
   private updatePhaseLogic(deltaTime: number): void {
+    // Don't update phase logic until simulation has started
+    if (!this.simulationStarted) {
+      return
+    }
+
     // Update starfield
     if (this.starfield) {
       this.starfield.update(deltaTime)
