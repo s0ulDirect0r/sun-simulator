@@ -763,20 +763,49 @@ class SunSimulator {
           // Track supernova duration
           this.supernovaTimer += deltaTime
 
-          // Start black hole formation during overlap period (2s before supernova ends)
-          if (this.supernovaTimer >= this.blackHoleTransitionStartTime && !this.blackHole) {
-            this.startBlackHoleFormation()
+          // Update black hole (present from t=0) - STAGED FORMATION
+          if (this.blackHole) {
+            this.blackHole.update(deltaTime)
+
+            const t = this.supernovaTimer
+
+            // Calculate each element's opacity based on its formation timeline
+            // Stage 1: Black hole scales during core collapse (t=0-1.5s)
+            let bhScale = 0
+            if (t <= 1.5) {
+              bhScale = t / 1.5 // Gradual growth over 1.5s
+            } else {
+              bhScale = 1.0
+            }
+            this.blackHole.setScale(bhScale)
+
+            // Stage 2: Event horizon snaps visible when core reaches singularity (t=1.2s)
+            let horizonOpacity = 0
+            if (t >= 1.2) {
+              horizonOpacity = 1.0 // INSTANT appearance
+            }
+            this.blackHole.setEventHorizonOpacity(horizonOpacity)
+
+            // Stage 3: Accretion disk forms gradually (t=2-4.5s)
+            let diskOpacity = 0
+            if (t >= 2.0 && t <= 4.5) {
+              diskOpacity = (t - 2.0) / 2.5 // 0→1 over 2.5s
+            } else if (t > 4.5) {
+              diskOpacity = 1.0
+            }
+            this.blackHole.setAccretionDiskOpacity(diskOpacity)
+
+            // Stage 4: Jets emerge last (t=3.5-7.5s) - slower, more gradual
+            let jetOpacity = 0
+            if (t >= 3.5 && t <= 7.5) {
+              jetOpacity = (t - 3.5) / 4.0 // 0→1 over 4 seconds (slower)
+            } else if (t > 7.5) {
+              jetOpacity = 1.0
+            }
+            this.blackHole.setJetOpacity(jetOpacity)
           }
 
-          // Fade in black hole during overlap (from t=6s to t=8s)
-          if (this.blackHole && this.supernovaTimer >= this.blackHoleTransitionStartTime) {
-            const overlapDuration = this.supernovaDuration - this.blackHoleTransitionStartTime // 2 seconds
-            const overlapProgress = (this.supernovaTimer - this.blackHoleTransitionStartTime) / overlapDuration
-            const fadeProgress = Math.min(overlapProgress, 1.0)
-            this.blackHole.setOpacity(fadeProgress)
-          }
-
-          // Complete transition when supernova ends
+          // Transition to black hole phase when supernova ends
           if (this.supernovaTimer >= this.supernovaDuration) {
             this.completeBlackHoleTransition()
           }
@@ -829,6 +858,15 @@ class SunSimulator {
       this.supernovaRemnant = new SupernovaRemnant(this.scene, currentStarRadius)
     }
 
+    // Create black hole immediately (physically accurate: forms during core collapse)
+    this.blackHole = new BlackHole(this.scene, this.camera)
+    this.blackHole.setScale(0) // Start at singularity point
+    // Initialize all elements invisible - they'll appear in stages
+    this.blackHole.setEventHorizonOpacity(0)
+    this.blackHole.setAccretionDiskOpacity(0)
+    this.blackHole.setJetOpacity(0)
+    console.log('[BLACK HOLE] Formation begins at singularity')
+
     // Hide planets during supernova
     if (this.planetSystem) {
       this.planetSystem.hide()
@@ -838,9 +876,9 @@ class SunSimulator {
     this.currentPhase = SimulationPhase.SUPERNOVA
     this.supernovaTimer = 0
     this.isCameraLocked = true // LOCK CAMERA - dramatic supernova needs fixed viewpoint
-    // Reset camera to optimal viewing position for supernova
-    this.camera.position.set(0, 0, 50)
-    this.cameraBasePosition.set(0, 0, 50)
+    // Reset camera to optimal viewing position for supernova (zoomed out for full view)
+    this.camera.position.set(0, 0, 80)
+    this.cameraBasePosition.set(0, 0, 80)
     // Reset camera target to look at center
     this.controls.target.set(0, 0, 0)
     this.controls.update()
@@ -854,25 +892,18 @@ class SunSimulator {
     )
   }
 
-  private startBlackHoleFormation(): void {
-    console.log('Beginning black hole formation (overlap with supernova fade)...')
+  private completeBlackHoleTransition(): void {
+    console.log('[BLACK HOLE] Transition complete - entering black hole phase')
 
-    // Create black hole with camera reference for shader effects
-    this.blackHole = new BlackHole(this.scene, this.camera)
+    // Black hole already exists and is fully formed (created at t=0, grown during t=0-2s)
+    // Now set up accretion and transition to BLACK_HOLE phase
 
     // Apply debug glow intensity if set
     if (this.blackHole) {
       this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
     }
 
-    // Start black hole at 0 opacity - will fade in during overlap
-    this.blackHole.setOpacity(0.0)
-  }
-
-  private completeBlackHoleTransition(): void {
-    console.log('Completing black hole transition...')
-
-    // Remove star (it should be fully faded by now)
+    // Remove star (core has collapsed)
     if (this.star) {
       this.star.dispose()
       this.star = null
