@@ -763,20 +763,46 @@ class SunSimulator {
           // Track supernova duration
           this.supernovaTimer += deltaTime
 
-          // Update black hole (present from t=0)
+          // Update black hole (present from t=0) - STAGED FORMATION
           if (this.blackHole) {
             this.blackHole.update(deltaTime)
 
-            // Grow black hole during core collapse (t=0-2s)
-            if (this.supernovaTimer <= 2.0) {
-              const growthProgress = this.supernovaTimer / 2.0
-              this.blackHole.setScale(growthProgress) // 0 → 1
-              this.blackHole.setOpacity(growthProgress) // 0 → 1
+            const t = this.supernovaTimer
+
+            // Calculate each element's opacity based on its formation timeline
+            // Stage 1: Black hole scales during core collapse (t=0-1.5s)
+            let bhScale = 0
+            if (t <= 1.5) {
+              bhScale = t / 1.5 // Gradual growth over 1.5s
             } else {
-              // Ensure fully grown after 2s
-              this.blackHole.setScale(1.0)
-              this.blackHole.setOpacity(1.0)
+              bhScale = 1.0
             }
+            this.blackHole.setScale(bhScale)
+
+            // Stage 2: Event horizon snaps visible when core reaches singularity (t=1.2s)
+            let horizonOpacity = 0
+            if (t >= 1.2) {
+              horizonOpacity = 1.0 // INSTANT appearance
+            }
+            this.blackHole.setEventHorizonOpacity(horizonOpacity)
+
+            // Stage 3: Accretion disk forms gradually (t=2-4.5s)
+            let diskOpacity = 0
+            if (t >= 2.0 && t <= 4.5) {
+              diskOpacity = (t - 2.0) / 2.5 // 0→1 over 2.5s
+            } else if (t > 4.5) {
+              diskOpacity = 1.0
+            }
+            this.blackHole.setAccretionDiskOpacity(diskOpacity)
+
+            // Stage 4: Jets emerge last (t=3.5-7.5s) - slower, more gradual
+            let jetOpacity = 0
+            if (t >= 3.5 && t <= 7.5) {
+              jetOpacity = (t - 3.5) / 4.0 // 0→1 over 4 seconds (slower)
+            } else if (t > 7.5) {
+              jetOpacity = 1.0
+            }
+            this.blackHole.setJetOpacity(jetOpacity)
           }
 
           // Transition to black hole phase when supernova ends
@@ -835,7 +861,10 @@ class SunSimulator {
     // Create black hole immediately (physically accurate: forms during core collapse)
     this.blackHole = new BlackHole(this.scene, this.camera)
     this.blackHole.setScale(0) // Start at singularity point
-    this.blackHole.setOpacity(0) // Start invisible
+    // Initialize all elements invisible - they'll appear in stages
+    this.blackHole.setEventHorizonOpacity(0)
+    this.blackHole.setAccretionDiskOpacity(0)
+    this.blackHole.setJetOpacity(0)
     console.log('[BLACK HOLE] Formation begins at singularity')
 
     // Hide planets during supernova
@@ -847,9 +876,9 @@ class SunSimulator {
     this.currentPhase = SimulationPhase.SUPERNOVA
     this.supernovaTimer = 0
     this.isCameraLocked = true // LOCK CAMERA - dramatic supernova needs fixed viewpoint
-    // Reset camera to optimal viewing position for supernova
-    this.camera.position.set(0, 0, 50)
-    this.cameraBasePosition.set(0, 0, 50)
+    // Reset camera to optimal viewing position for supernova (zoomed out for full view)
+    this.camera.position.set(0, 0, 80)
+    this.cameraBasePosition.set(0, 0, 80)
     // Reset camera target to look at center
     this.controls.target.set(0, 0, 0)
     this.controls.update()

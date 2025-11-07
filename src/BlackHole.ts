@@ -276,6 +276,25 @@ export class BlackHole {
     ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = opacity * 0.8
   }
 
+  // Separate control for staged formation (physically accurate)
+  public setEventHorizonOpacity(opacity: number): void {
+    this.isForming = false
+    this.eventHorizonMaterial.opacity = opacity * 1.0
+    this.eventHorizonMaterial.uniforms.glowIntensity.value = opacity * 8.0
+
+    const lensingMaterial = this.lensingRing.material as THREE.MeshBasicMaterial
+    lensingMaterial.opacity = opacity * 0.6
+  }
+
+  public setAccretionDiskOpacity(opacity: number): void {
+    this.accretionDiskMaterial.uniforms.globalOpacity.value = opacity * 1.0
+  }
+
+  public setJetOpacity(opacity: number): void {
+    this.jetMaterial.uniforms.opacity.value = opacity * 0.8
+    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = opacity * 0.8
+  }
+
   public dispose(): void {
     this.eventHorizon.geometry.dispose()
     this.eventHorizonMaterial.dispose()

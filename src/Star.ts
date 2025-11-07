@@ -74,7 +74,7 @@ export class Star {
   // Core collapse state (physically accurate: happens at supernova start)
   private isCollapsing: boolean = false
   private collapseTime: number = 0
-  private collapseDuration: number = 2.0 // 2 seconds for core to collapse to singularity
+  private collapseDuration: number = 1.5 // 1.5 seconds for core collapse
   private collapseStartScale: number = 1.0
 
   constructor(scene: THREE.Scene, initialRadius: number = 4.8) {
@@ -695,13 +695,16 @@ export class Star {
     // Trigger core collapse simultaneously (physically accurate)
     this.startCollapse()
 
-    // Hide red giant volumetric layers
+    // Hide red giant volumetric layers (set opacity AND visibility to prevent rendering interference)
     const innerMaterial = this.redGiantInnerLayer.material as THREE.MeshBasicMaterial
     const midMaterial = this.redGiantMidLayer.material as THREE.MeshBasicMaterial
     const outerMaterial = this.redGiantOuterLayer.material as THREE.MeshBasicMaterial
     innerMaterial.opacity = 0
     midMaterial.opacity = 0
     outerMaterial.opacity = 0
+    this.redGiantInnerLayer.visible = false
+    this.redGiantMidLayer.visible = false
+    this.redGiantOuterLayer.visible = false
     console.log('SUPERNOVA!')
 
     // Create dramatic scene-filling flash

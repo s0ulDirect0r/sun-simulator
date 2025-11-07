@@ -82,8 +82,8 @@ void main() {
   float edgeFade = 1.0 - smoothstep(0.5, 1.0, distFromAxis);
   edgeFade = pow(edgeFade, 2.0); // Sharper falloff
 
-  // FLOWING EFFECT: Create waves flowing outward from base
-  // Scrolling noise pattern moves along jet axis
+  // FLOWING EFFECT: Continuous plasma with organic turbulence
+  // Multi-scale noise for natural plasma variation (no artificial bands)
   vec3 flowingNoisePos = vec3(
     vWorldPosition.x,
     vWorldPosition.y - time * flowSpeed, // Flows outward
@@ -91,12 +91,12 @@ void main() {
   ) * 0.15;
   float flowingNoise = noise(flowingNoisePos);
 
-  // Create streaming "blobs" of brightness (more frequent for visual interest)
-  float streamingWaves = sin(distAlongJet * 15.0 - time * flowSpeed * 3.0) * 0.5 + 0.5;
-  streamingWaves = pow(streamingWaves, 3.0); // Sharper peaks
+  // Add finer detail with higher frequency noise
+  vec3 detailNoisePos = flowingNoisePos * 2.5;
+  float detailNoise = noise(detailNoisePos);
 
-  // Combine turbulence and streaming
-  float turbulence = flowingNoise * 0.4 + streamingWaves * 0.3 + 0.5;
+  // Combine multiple noise scales for organic, continuous variation
+  float turbulence = flowingNoise * 0.6 + detailNoise * 0.2 + 0.5;
 
   // Pulsing glow at the base
   float basePulse = (1.0 - distAlongJet) * (sin(time * 2.0) * 0.2 + 0.8);
