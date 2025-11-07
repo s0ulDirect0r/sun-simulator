@@ -74,6 +74,8 @@ class SunSimulator {
     accretionSources: true,
     supernovaRemnant: true,
     redGiantLayers: true,
+    stellarWind: true, // Toggle stellar wind particles (surface activity)
+    surfaceTexture: true, // Toggle surface texture particles
     bloom: true,
     filmGrain: true,
     vignette: true,
@@ -350,6 +352,10 @@ class SunSimulator {
       this.star.redGiantInnerLayer.visible = this.debugState.redGiantLayers
       this.star.redGiantMidLayer.visible = this.debugState.redGiantLayers
       this.star.redGiantOuterLayer.visible = this.debugState.redGiantLayers
+
+      // Stellar wind and surface texture particles
+      this.star.surfaceParticles.visible = this.debugState.stellarWind
+      this.star.surfaceTexture.visible = this.debugState.surfaceTexture
     }
 
     // Post-processing
@@ -483,6 +489,16 @@ class SunSimulator {
           this.applyDebugState()
           console.log(`[DEBUG] Red Giant Layers: ${this.debugState.redGiantLayers ? 'ON' : 'OFF'}`)
           console.log(`[DEBUG] Star exists: ${!!this.star}, Is red giant: ${this.star?.isInRedGiantPhase()}`)
+          break
+        case '8':
+          this.debugState.stellarWind = !this.debugState.stellarWind
+          this.applyDebugState()
+          console.log(`[DEBUG] Stellar Wind: ${this.debugState.stellarWind ? 'ON' : 'OFF'}`)
+          break
+        case '9':
+          this.debugState.surfaceTexture = !this.debugState.surfaceTexture
+          this.applyDebugState()
+          console.log(`[DEBUG] Surface Texture: ${this.debugState.surfaceTexture ? 'ON' : 'OFF'}`)
           break
         case 'l':
           this.debugState.ambientLight = !this.debugState.ambientLight

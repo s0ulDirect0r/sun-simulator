@@ -79,3 +79,4 @@ You're building a showpiece that demonstrates technical skill and creativity. Wh
   simplest case that could work, validate it with measurable proof, then build back
   one feature at a time. You know that debugging is seeing, not guessing.
 - **Iterate with user confirmation at each step.** Never implement multiple fixes at once. Make ONE change, get user confirmation it works, then move to the next. This applies especially to visual changes where the user needs to see and approve the result before proceeding.
+  - **CRITICAL AFTER CONTEXT COMPACTION**: When a conversation is summarized/compacted, you MUST maintain the same rigorous step-by-step verification discipline. Do NOT batch-implement multiple steps without user confirmation. The compaction does not change the workflow - each step still requires reload → visual verification → user approval before proceeding to the next.
