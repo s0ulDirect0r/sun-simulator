@@ -57,6 +57,7 @@ class SunSimulator {
   private redGiantDuration: number = 45.0 // 45 seconds total: 24s expansion + 21s stable red giant before supernova
   private supernovaTimer: number = 0
   private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
+  private blackHoleTransitionStartTime: number = 6.0 // Start black hole formation 2s before supernova ends
   private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
   private isPaused: boolean = true // Start paused until user clicks "Begin Simulation"
   private timeScale: number = 1.0
@@ -668,11 +669,22 @@ class SunSimulator {
       }
     }
 
-    // Dynamic bloom intensity based on supernova flash (unless manually overridden)
+    // Dynamic bloom intensity based on star phase (unless manually overridden)
     if (this.star && !this.debugState.overrideBloom) {
       const shakeIntensity = this.star.getCameraShakeIntensity()
-      // Bloom gets INSANE during supernova (0.8 base → 3.5 peak)
-      this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 3.5, shakeIntensity)
+
+      if (shakeIntensity > 0) {
+        // Supernova: bloom gets INSANE (0.8 base → 3.5 peak)
+        this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 3.5, shakeIntensity)
+      } else if (this.star.isInRedGiantPhase()) {
+        // Red giant: reduce bloom as star cools and reddens
+        const expansionProgress = this.star.getExpansionProgress()
+        // Start at 0.8 (main sequence bloom), reduce to 0.5 (cooler red giant)
+        this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 0.5, expansionProgress)
+      } else {
+        // Main sequence: normal bloom
+        this.bloomPass.strength = 0.8
+      }
     }
 
     // Update debug stats if overlay is visible
@@ -748,10 +760,25 @@ class SunSimulator {
         if (this.star) {
           this.star.update(deltaTime)
 
-          // Track supernova duration and trigger black hole
+          // Track supernova duration
           this.supernovaTimer += deltaTime
+
+          // Start black hole formation during overlap period (2s before supernova ends)
+          if (this.supernovaTimer >= this.blackHoleTransitionStartTime && !this.blackHole) {
+            this.startBlackHoleFormation()
+          }
+
+          // Fade in black hole during overlap (from t=6s to t=8s)
+          if (this.blackHole && this.supernovaTimer >= this.blackHoleTransitionStartTime) {
+            const overlapDuration = this.supernovaDuration - this.blackHoleTransitionStartTime // 2 seconds
+            const overlapProgress = (this.supernovaTimer - this.blackHoleTransitionStartTime) / overlapDuration
+            const fadeProgress = Math.min(overlapProgress, 1.0)
+            this.blackHole.setOpacity(fadeProgress)
+          }
+
+          // Complete transition when supernova ends
           if (this.supernovaTimer >= this.supernovaDuration) {
-            this.startBlackHole()
+            this.completeBlackHoleTransition()
           }
         }
         break
@@ -759,6 +786,8 @@ class SunSimulator {
       case SimulationPhase.BLACK_HOLE:
         if (this.blackHole) {
           this.blackHole.update(deltaTime)
+          // Black hole should already be at full opacity from supernova overlap fade-in
+          this.blackHole.setOpacity(1.0)
         }
         // Continue updating supernova remnant for accretion effect
         if (this.supernovaRemnant) {
@@ -825,8 +854,8 @@ class SunSimulator {
     )
   }
 
-  private startBlackHole(): void {
-    console.log('Collapsing into black hole...')
+  private startBlackHoleFormation(): void {
+    console.log('Beginning black hole formation (overlap with supernova fade)...')
 
     // Create black hole with camera reference for shader effects
     this.blackHole = new BlackHole(this.scene, this.camera)
@@ -836,7 +865,14 @@ class SunSimulator {
       this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
     }
 
-    // Remove star
+    // Start black hole at 0 opacity - will fade in during overlap
+    this.blackHole.setOpacity(0.0)
+  }
+
+  private completeBlackHoleTransition(): void {
+    console.log('Completing black hole transition...')
+
+    // Remove star (it should be fully faded by now)
     if (this.star) {
       this.star.dispose()
       this.star = null
