@@ -57,6 +57,7 @@ class SunSimulator {
   private redGiantDuration: number = 45.0 // 45 seconds total: 24s expansion + 21s stable red giant before supernova
   private supernovaTimer: number = 0
   private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
+  private blackHoleTransitionStartTime: number = 6.0 // Start black hole formation 2s before supernova ends
   private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
   private isPaused: boolean = true // Start paused until user clicks "Begin Simulation"
   private timeScale: number = 1.0
@@ -668,11 +669,22 @@ class SunSimulator {
       }
     }
 
-    // Dynamic bloom intensity based on supernova flash (unless manually overridden)
+    // Dynamic bloom intensity based on star phase (unless manually overridden)
     if (this.star && !this.debugState.overrideBloom) {
       const shakeIntensity = this.star.getCameraShakeIntensity()
-      // Bloom gets INSANE during supernova (0.8 base → 3.5 peak)
-      this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 3.5, shakeIntensity)
+
+      if (shakeIntensity > 0) {
+        // Supernova: bloom gets INSANE (0.8 base → 3.5 peak)
+        this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 3.5, shakeIntensity)
+      } else if (this.star.isInRedGiantPhase()) {
+        // Red giant: reduce bloom as star cools and reddens
+        const expansionProgress = this.star.getExpansionProgress()
+        // Start at 0.8 (main sequence bloom), reduce to 0.5 (cooler red giant)
+        this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 0.5, expansionProgress)
+      } else {
+        // Main sequence: normal bloom
+        this.bloomPass.strength = 0.8
+      }
     }
 
     // Update debug stats if overlay is visible
@@ -777,6 +789,8 @@ class SunSimulator {
       case SimulationPhase.BLACK_HOLE:
         if (this.blackHole) {
           this.blackHole.update(deltaTime)
+          // Black hole should already be at full opacity from supernova overlap fade-in
+          this.blackHole.setOpacity(1.0)
         }
         // Continue updating supernova remnant for accretion effect
         if (this.supernovaRemnant) {
@@ -854,6 +868,11 @@ class SunSimulator {
 
     // Black hole already exists and is fully formed (created at t=0, grown during t=0-2s)
     // Now set up accretion and transition to BLACK_HOLE phase
+
+    // Apply debug glow intensity if set
+    if (this.blackHole) {
+      this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
+    }
 
     // Remove star (core has collapsed)
     if (this.star) {

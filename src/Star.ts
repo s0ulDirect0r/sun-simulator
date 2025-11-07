@@ -14,6 +14,10 @@ export class Star {
   private coronaMaterial!: THREE.PointsMaterial
   private coronaCount: number = 1000
   private coronaPositions!: Float32Array
+  private coronaFadeInDuration: number = 2.0 // Fade in over 2 seconds
+  private coronaFadeInTime: number = 0
+  private coronaFadeOutDuration: number = 3.0 // Fade out over 3 seconds during red giant start
+  private coronaFadeOutTime: number = 0
 
   // Surface texture particles for mottled appearance
   private surfaceTexture!: THREE.Points
@@ -265,7 +269,7 @@ export class Star {
       size: 0.4, // Smaller particles
       color: 0xffffaa, // Soft yellow-white
       transparent: true,
-      opacity: 0.5, // Subtle glow
+      opacity: 0.0, // Start invisible, fade in during main sequence
       blending: THREE.AdditiveBlending,
       depthWrite: false
     })
@@ -452,9 +456,8 @@ export class Star {
       material.emissive.lerpColors(mainSequenceEmissive, redGiantEmissive, expansionProgress)
 
       // Red giants are cooler but larger, so less emissive intensity
-      // Use squared progression so brightness stays high longer, then drops toward the end
-      const brightnessDropProgress = expansionProgress * expansionProgress
-      material.emissiveIntensity = THREE.MathUtils.lerp(3, 2, brightnessDropProgress)
+      // Use linear progression to match color transition
+      material.emissiveIntensity = THREE.MathUtils.lerp(3, 2, expansionProgress)
 
       // Surface opacity variation - make red giant more diffuse/transparent
       // Also delay the transparency to maintain solid appearance longer
@@ -478,9 +481,26 @@ export class Star {
     this.corona.rotation.y += 0.0005
     this.corona.rotation.x += 0.0002
 
-    // Hide corona during red giant phase (red giants have diffuse atmospheres, not distinct coronas)
+    // Fade in corona during early main sequence (unless red giant or supernova)
+    if (!this.isRedGiant && !this.isSupernova) {
+      if (this.coronaFadeInTime < this.coronaFadeInDuration) {
+        this.coronaFadeInTime += deltaTime
+        const fadeProgress = Math.min(this.coronaFadeInTime / this.coronaFadeInDuration, 1.0)
+        // Fade from 0 to 0.5 (subtle glow)
+        this.coronaMaterial.opacity = fadeProgress * 0.5
+      }
+    }
+
+    // Fade out corona during red giant phase (red giants have diffuse atmospheres, not distinct coronas)
     if (this.isRedGiant && !this.isSupernova) {
-      this.coronaMaterial.opacity = 0.0
+      if (this.coronaFadeOutTime < this.coronaFadeOutDuration) {
+        this.coronaFadeOutTime += deltaTime
+        const fadeProgress = Math.min(this.coronaFadeOutTime / this.coronaFadeOutDuration, 1.0)
+        // Fade from 0.5 (main sequence) to 0.0 (invisible)
+        this.coronaMaterial.opacity = (1.0 - fadeProgress) * 0.5
+      } else {
+        this.coronaMaterial.opacity = 0.0
+      }
 
       // Update volumetric layers for depth effect - only if they're visible
       const innerMaterial = this.redGiantInnerLayer.material as THREE.MeshBasicMaterial
@@ -650,6 +670,11 @@ export class Star {
 
   public isInRedGiantPhase(): boolean {
     return this.isRedGiant
+  }
+
+  public getExpansionProgress(): number {
+    if (!this.isRedGiant) return 0
+    return Math.min(this.expansionTime / this.expansionDuration, 1.0)
   }
 
   public startCollapse(): void {
