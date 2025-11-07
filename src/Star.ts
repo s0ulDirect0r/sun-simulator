@@ -47,6 +47,11 @@ export class Star {
   private expansionStartRadius: number = 4.0
   private irregularPulseOffset: number = 0 // Random variation in pulsing
 
+  // Red giant volumetric layers for depth effect (public for debug toggles)
+  public redGiantInnerLayer!: THREE.Mesh
+  public redGiantMidLayer!: THREE.Mesh
+  public redGiantOuterLayer!: THREE.Mesh
+
   // Supernova state
   private isSupernova: boolean = false
   private supernovaTime: number = 0
@@ -71,6 +76,9 @@ export class Star {
 
     // Create surface texture particles (for mottled red giant appearance)
     this.createSurfaceTexture()
+
+    // Create red giant volumetric layers (invisible initially)
+    this.createRedGiantLayers()
 
     // Create shockwave (invisible initially)
     this.createShockwave()
@@ -135,6 +143,47 @@ export class Star {
 
     this.surfaceTexture = new THREE.Points(this.surfaceTextureGeometry, this.surfaceTextureMaterial)
     this.scene.add(this.surfaceTexture)
+  }
+
+  private createRedGiantLayers(): void {
+    // Create multiple semi-transparent spheres for volumetric depth effect
+    // These are only visible during red giant phase
+
+    // Inner layer (brightest, hottest core)
+    const innerGeometry = new THREE.SphereGeometry(1, 32, 32)
+    const innerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff8844, // Bright orange-yellow core
+      transparent: true,
+      opacity: 0.0, // Start invisible
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide // Render from inside for depth
+    })
+    this.redGiantInnerLayer = new THREE.Mesh(innerGeometry, innerMaterial)
+    this.scene.add(this.redGiantInnerLayer)
+
+    // Mid layer (medium brightness)
+    const midGeometry = new THREE.SphereGeometry(1, 32, 32)
+    const midMaterial = new THREE.MeshBasicMaterial({
+      color: 0xff5533, // Red-orange middle atmosphere
+      transparent: true,
+      opacity: 0.0, // Start invisible
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide
+    })
+    this.redGiantMidLayer = new THREE.Mesh(midGeometry, midMaterial)
+    this.scene.add(this.redGiantMidLayer)
+
+    // Outer layer (dimmest, most diffuse)
+    const outerGeometry = new THREE.SphereGeometry(1, 32, 32)
+    const outerMaterial = new THREE.MeshBasicMaterial({
+      color: 0xcc2211, // Deep red outer atmosphere
+      transparent: true,
+      opacity: 0.0, // Start invisible
+      blending: THREE.AdditiveBlending,
+      side: THREE.BackSide
+    })
+    this.redGiantOuterLayer = new THREE.Mesh(outerGeometry, outerMaterial)
+    this.scene.add(this.redGiantOuterLayer)
   }
 
   private createStar(): void {
@@ -356,12 +405,16 @@ export class Star {
       const redGiantEmissive = new THREE.Color(0xff4422)
       material.emissive.lerpColors(mainSequenceEmissive, redGiantEmissive, expansionProgress)
 
-      // Red giants are cooler but larger, so slightly less emissive intensity
-      material.emissiveIntensity = THREE.MathUtils.lerp(3, 2, expansionProgress)
+      // Red giants are cooler but larger, so less emissive intensity
+      // Use squared progression so brightness stays high longer, then drops toward the end
+      const brightnessDropProgress = expansionProgress * expansionProgress
+      material.emissiveIntensity = THREE.MathUtils.lerp(3, 2, brightnessDropProgress)
 
       // Surface opacity variation - make red giant more diffuse/transparent
+      // Also delay the transparency to maintain solid appearance longer
       material.transparent = true
-      material.opacity = THREE.MathUtils.lerp(1.0, 0.85, expansionProgress)
+      const opacityProgress = Math.max(0, (expansionProgress - 0.3) / 0.7) // Start at 30% expansion
+      material.opacity = THREE.MathUtils.lerp(1.0, 0.7, opacityProgress) // More transparent to show inner layers
     }
 
     // Pulsing light intensity - dimmer for red giants (cooler surface)
@@ -379,13 +432,37 @@ export class Star {
     this.corona.rotation.y += 0.0005
     this.corona.rotation.x += 0.0002
 
-    // Scale corona with star expansion for red giants
-    if (this.isRedGiant) {
-      const coronaScale = this.currentRadius / this.starRadius
-      this.corona.scale.setScalar(coronaScale)
+    // Hide corona during red giant phase (red giants have diffuse atmospheres, not distinct coronas)
+    if (this.isRedGiant && !this.isSupernova) {
+      this.coronaMaterial.opacity = 0.0
 
-      // Make corona more visible for red giants
-      this.coronaMaterial.opacity = THREE.MathUtils.lerp(0.5, 0.7, expansionProgress)
+      // Update volumetric layers for depth effect - only if they're visible
+      const innerMaterial = this.redGiantInnerLayer.material as THREE.MeshBasicMaterial
+      const midMaterial = this.redGiantMidLayer.material as THREE.MeshBasicMaterial
+      const outerMaterial = this.redGiantOuterLayer.material as THREE.MeshBasicMaterial
+
+      if (this.redGiantInnerLayer.visible) {
+        // Scale layers to actual world size, spread them out for visible depth
+        // Inner layer - hot core at 70% of current radius
+        const innerScale = this.currentRadius * 0.7 * pulse
+        this.redGiantInnerLayer.scale.setScalar(innerScale)
+        innerMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.4, expansionProgress)
+
+        // Mid layer - at 95% of current radius (just below surface)
+        const midScale = this.currentRadius * 0.95 * pulse
+        this.redGiantMidLayer.scale.setScalar(midScale)
+        midMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.3, expansionProgress)
+
+        // Outer layer - at 120% of current radius (extended diffuse atmosphere)
+        const outerScale = this.currentRadius * 1.2 * pulse
+        this.redGiantOuterLayer.scale.setScalar(outerScale)
+        outerMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.25, expansionProgress)
+      } else {
+        // When toggled off, ensure layers are invisible
+        innerMaterial.opacity = 0
+        midMaterial.opacity = 0
+        outerMaterial.opacity = 0
+      }
 
       // Animate surface texture particles - make them breathe and move with convection
       this.surfaceTextureMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.4, expansionProgress)
@@ -498,6 +575,14 @@ export class Star {
 
     this.isSupernova = true
     this.supernovaTime = 0
+
+    // Hide red giant volumetric layers
+    const innerMaterial = this.redGiantInnerLayer.material as THREE.MeshBasicMaterial
+    const midMaterial = this.redGiantMidLayer.material as THREE.MeshBasicMaterial
+    const outerMaterial = this.redGiantOuterLayer.material as THREE.MeshBasicMaterial
+    innerMaterial.opacity = 0
+    midMaterial.opacity = 0
+    outerMaterial.opacity = 0
     console.log('SUPERNOVA!')
 
     // Create dramatic scene-filling flash
@@ -540,6 +625,9 @@ export class Star {
     this.scene.remove(this.surfaceTexture)
     this.scene.remove(this.corona)
     this.scene.remove(this.surfaceParticles)
+    this.scene.remove(this.redGiantInnerLayer)
+    this.scene.remove(this.redGiantMidLayer)
+    this.scene.remove(this.redGiantOuterLayer)
 
     // Dispose geometries and materials
     this.star.geometry.dispose()
@@ -552,6 +640,12 @@ export class Star {
     this.surfaceMaterial.dispose()
     this.surfaceTextureGeometry.dispose()
     this.surfaceTextureMaterial.dispose()
+    this.redGiantInnerLayer.geometry.dispose()
+    ;(this.redGiantInnerLayer.material as THREE.Material).dispose()
+    this.redGiantMidLayer.geometry.dispose()
+    ;(this.redGiantMidLayer.material as THREE.Material).dispose()
+    this.redGiantOuterLayer.geometry.dispose()
+    ;(this.redGiantOuterLayer.material as THREE.Material).dispose()
 
     // Dispose supernova flash if it exists
     if (this.supernovaFlash) {

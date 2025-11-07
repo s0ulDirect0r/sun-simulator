@@ -35,6 +35,21 @@ This is a creative technical project, not a research simulation. Your goal is to
 - Prioritize smooth animation and transitions over simulation accuracy
 - Keep UI minimal and clean - let the visuals dominate
 
+### Visual Continuity Rule (CRITICAL)
+**All visual elements MUST fade in/out during phase transitions. NEVER abruptly dispose or hide objects.**
+
+- Animate opacity to 0 over 0.5-1s before disposal
+- Fade in new elements when they appear
+- No sudden pops, hard cuts, or jarring visual changes
+- Smooth transitions create professional polish and are essential for demo impact
+- This applies to: particles, meshes, lights, layers, corona, everything
+
+Examples:
+- ✅ Corona fades out as red giant expansion begins
+- ❌ Corona.visible = false (instant disappearance)
+- ✅ Volumetric layers fade in with expansionProgress
+- ❌ Layers suddenly appear at full opacity
+
 ## Key Simulation Phases to Implement
 1. **Nebula Collapse**: Swirling particles coalescing under gravity
 2. **Main Sequence Star**: Stable, glowing sphere with surface activity

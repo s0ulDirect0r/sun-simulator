@@ -73,6 +73,7 @@ class SunSimulator {
     ambientLight: true,
     accretionSources: true,
     supernovaRemnant: true,
+    redGiantLayers: true,
     bloom: true,
     filmGrain: true,
     vignette: true,
@@ -344,6 +345,13 @@ class SunSimulator {
       })
     }
 
+    // Red giant volumetric layers
+    if (this.star) {
+      this.star.redGiantInnerLayer.visible = this.debugState.redGiantLayers
+      this.star.redGiantMidLayer.visible = this.debugState.redGiantLayers
+      this.star.redGiantOuterLayer.visible = this.debugState.redGiantLayers
+    }
+
     // Post-processing
     this.bloomPass.enabled = this.debugState.bloom
     this.filmGrainPass.enabled = this.debugState.filmGrain
@@ -470,6 +478,12 @@ class SunSimulator {
           this.applyDebugState()
           console.log(`[DEBUG] Supernova Remnant: ${this.debugState.supernovaRemnant ? 'ON' : 'OFF'}`)
           break
+        case '7':
+          this.debugState.redGiantLayers = !this.debugState.redGiantLayers
+          this.applyDebugState()
+          console.log(`[DEBUG] Red Giant Layers: ${this.debugState.redGiantLayers ? 'ON' : 'OFF'}`)
+          console.log(`[DEBUG] Star exists: ${!!this.star}, Is red giant: ${this.star?.isInRedGiantPhase()}`)
+          break
         case 'l':
           this.debugState.ambientLight = !this.debugState.ambientLight
           this.debugState.pointLight = this.debugState.ambientLight // Toggle both together
@@ -509,6 +523,7 @@ class SunSimulator {
           this.debugState.pointLight = newState
           this.debugState.accretionSources = newState
           this.debugState.supernovaRemnant = newState
+          this.debugState.redGiantLayers = newState
           this.debugState.bloom = newState
           this.debugState.filmGrain = newState
           this.debugState.vignette = newState
