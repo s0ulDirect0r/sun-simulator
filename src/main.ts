@@ -57,7 +57,6 @@ class SunSimulator {
   private redGiantDuration: number = 45.0 // 45 seconds total: 24s expansion + 21s stable red giant before supernova
   private supernovaTimer: number = 0
   private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
-  private blackHoleTransitionStartTime: number = 6.0 // Start black hole formation 2s before supernova ends
   private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
   private isPaused: boolean = true // Start paused until user clicks "Begin Simulation"
   private timeScale: number = 1.0
@@ -574,7 +573,7 @@ class SunSimulator {
         ehGlowVal.textContent = this.debugState.eventHorizonGlow.toFixed(2)
         // Apply to black hole if it exists
         if (this.blackHole) {
-          this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
+          (this.blackHole.eventHorizon.material as THREE.ShaderMaterial).uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
         }
       })
     }
@@ -615,7 +614,7 @@ class SunSimulator {
 
         // Apply to black hole if it exists
         if (this.blackHole) {
-          this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = 2.0
+          (this.blackHole.eventHorizon.material as THREE.ShaderMaterial).uniforms.glowIntensity.value = 2.0
         }
 
         console.log('[DEBUG] Bloom controls reset to defaults')
@@ -859,7 +858,7 @@ class SunSimulator {
     }
 
     // Create black hole immediately (physically accurate: forms during core collapse)
-    this.blackHole = new BlackHole(this.scene, this.camera)
+    this.blackHole = new BlackHole(this.scene)
     this.blackHole.setScale(0) // Start at singularity point
     // Initialize all elements invisible - they'll appear in stages
     this.blackHole.setEventHorizonOpacity(0)
@@ -900,7 +899,7 @@ class SunSimulator {
 
     // Apply debug glow intensity if set
     if (this.blackHole) {
-      this.blackHole.eventHorizon.material.uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
+      (this.blackHole.eventHorizon.material as THREE.ShaderMaterial).uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
     }
 
     // Remove star (core has collapsed)

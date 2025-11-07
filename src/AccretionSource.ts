@@ -185,7 +185,6 @@ export class AccretionSource {
       // Tangential velocity (perpendicular for orbital motion)
       // Cross product: radial × up(0,1,0) = tangent
       const radialX = dx / dist
-      const radialY = dy / dist
       const radialZ = dz / dist
 
       const tangentX = -radialZ

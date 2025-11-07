@@ -5,7 +5,6 @@ import { createJetTrailMaterial } from './shaders/JetTrailShader'
 
 export class BlackHole {
   private scene: THREE.Scene
-  private camera: THREE.Camera // Needed for gravitational lensing calculations
   public eventHorizon!: THREE.Mesh // Public for debug toggles
   private eventHorizonMaterial!: THREE.ShaderMaterial
   public accretionDisk!: THREE.Mesh // Public for debug toggles
@@ -32,9 +31,8 @@ export class BlackHole {
   private formationDuration: number = 4.0
   private isForming: boolean = true
 
-  constructor(scene: THREE.Scene, camera: THREE.Camera) {
+  constructor(scene: THREE.Scene) {
     this.scene = scene
-    this.camera = camera
 
     this.createEventHorizon()
     this.createAccretionDisk()
