@@ -895,7 +895,7 @@ class SunSimulator {
         }
 
         // Smoothly move camera to elevated position to see the disk better
-        // Target: (0, 8, 95) from current position (0, 0, 80)
+        // Target: (0, 8, 95) from current position (0, 0, 76)
         const targetY = 8
         const targetZ = 95
         this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetY, 0.01)
@@ -961,9 +961,9 @@ class SunSimulator {
     this.currentPhase = SimulationPhase.SUPERNOVA
     this.supernovaTimer = 0
     this.isCameraLocked = true // LOCK CAMERA - dramatic supernova needs fixed viewpoint
-    // Reset camera to optimal viewing position for supernova (zoomed out for full view)
-    this.camera.position.set(0, 0, 80)
-    this.cameraBasePosition.set(0, 0, 80)
+    // Reset camera to optimal viewing position for supernova (zoomed in 5% closer)
+    this.camera.position.set(0, 0, 76)
+    this.cameraBasePosition.set(0, 0, 76)
     // Reset camera target to look at center
     this.controls.target.set(0, 0, 0)
     this.controls.update()
