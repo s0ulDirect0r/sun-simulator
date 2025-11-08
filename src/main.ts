@@ -64,6 +64,7 @@ class SunSimulator {
   private timeScale: number = 1.0
   private simulationStarted: boolean = false // Track if simulation has started
   private isCameraLocked: boolean = true // Start locked during nebula
+  private blackHoleCameraTransitioned: boolean = false // Track if initial black hole camera move is done
 
   // Debug state for toggling visual elements
   private debugState = {
@@ -894,14 +895,23 @@ class SunSimulator {
           this.lensingPass.setSchwarzschildRadius(this.blackHole.getEventHorizonRadius())
         }
 
-        // Smoothly move camera to elevated position to see the disk better
-        // Target: (0, 8, 95) from current position (0, 0, 76)
-        const targetY = 8
-        const targetZ = 95
-        this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetY, 0.01)
-        this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, targetZ, 0.01)
-        this.cameraBasePosition.copy(this.camera.position)
-        this.controls.update()
+        // Smoothly move camera to elevated position ONCE at start of phase, then free camera
+        if (!this.blackHoleCameraTransitioned) {
+          const targetY = 8
+          const targetZ = 95
+          this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetY, 0.02)
+          this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, targetZ, 0.02)
+          this.cameraBasePosition.copy(this.camera.position)
+          this.controls.update()
+
+          // Check if camera is close enough to target (within 1 unit) to consider transition complete
+          const distanceToTarget = Math.abs(this.camera.position.y - targetY) + Math.abs(this.camera.position.z - targetZ)
+          if (distanceToTarget < 1.0) {
+            this.blackHoleCameraTransitioned = true
+            this.isCameraLocked = false // FREE CAMERA - user can explore
+            console.log('[BLACK HOLE] Camera transition complete - camera unlocked')
+          }
+        }
 
         // Continue updating supernova remnant for accretion effect
         if (this.supernovaRemnant) {
@@ -1065,8 +1075,9 @@ class SunSimulator {
 
     // Update phase
     this.currentPhase = SimulationPhase.BLACK_HOLE
-    this.isCameraLocked = true // Keep camera locked for black hole phase
-    // Phase 5: Camera will smoothly move in the update loop (not instant)
+    this.isCameraLocked = true // Temporarily locked during initial camera transition
+    this.blackHoleCameraTransitioned = false // Reset flag for smooth transition
+    // Phase 5: Camera will smoothly move in the update loop, then unlock
     this.lastDebugText = ''
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
