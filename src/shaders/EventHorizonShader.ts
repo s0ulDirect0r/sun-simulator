@@ -112,46 +112,23 @@ void main() {
   vec3 viewDir = normalize(cameraPosition - vWorldPosition);
   vec3 normal = normalize(vNormal);
 
-  // Fresnel term - glow at edges (simulates photon sphere at 1.5× Schwarzschild radius)
-  // Gentler falloff for more visible glow
+  // Fresnel term - 0 at center (looking straight at surface), 1 at edges (grazing angle)
   float fresnel = pow(1.0 - abs(dot(viewDir, normal)), 1.5);
 
-  // Distance from center (normalized)
-  float distFromCenter = length(vPosition) / schwarzschildRadius;
-
-  // Create photon sphere ring effect - much wider and more visible
-  // Start glow from center, peak at edges
-  float photonSphereEdge = smoothstep(0.3, 1.0, distFromCenter);
+  // VOID CALCULATION: Use viewing angle, not geometric distance
+  // When looking at the center of the sphere (fresnel ~0), we want pure black
+  // Only at the edges (fresnel ~1) should we see glow
 
   // Pulsating glow effect - slower, more dramatic
   float pulse = sin(time * 1.5) * 0.5 + 0.5;
 
-  // Base glow - visible across entire sphere
-  float glowStrength = (fresnel + 0.3) * photonSphereEdge * glowIntensity * (0.8 + pulse * 0.2);
+  // PURE VOID - completely black, no glow
+  // The glow will be a separate shell object
+  vec3 voidColor = vec3(0.0, 0.0, 0.0); // Absolute blackness
+  vec3 finalColor = voidColor; // Pure black everywhere
 
-  // Add extra brightness boost at the very edge
-  float edgeBoost = smoothstep(0.8, 1.0, distFromCenter) * 3.0;
-  glowStrength += edgeBoost * glowIntensity;
-
-  // Core darkness - perfectly black in center, glowing at edges
-  float coreDarkness = smoothstep(0.0, 0.8, distFromCenter);
-
-  // Final color: black core with INTENSE glowing edge
-  vec3 edgeGlow = glowColor * glowStrength;
-  vec3 voidColor = vec3(0.0, 0.0, 0.0);
-
-  // Mix between void and glow based on position
-  vec3 finalColor = mix(voidColor, edgeGlow, coreDarkness);
-
-  // Add dramatic turbulence at the edge
-  float turbulence = sin(vUv.x * 20.0 + time) * cos(vUv.y * 20.0 + time * 0.7);
-  finalColor += glowColor * turbulence * 0.15 * photonSphereEdge;
-
-  // Extra additive glow boost to make it visible against bright disk (reduced for better balance)
-  finalColor += edgeGlow * 0.1;
-
-  // Set alpha based on distance from center - more opaque at edges
-  float alpha = mix(1.0, 0.95 + glowStrength * 0.05, coreDarkness);
+  // Alpha: FULLY OPAQUE everywhere to block background
+  float alpha = 1.0;
 
   gl_FragColor = vec4(finalColor, alpha);
 }
@@ -167,13 +144,13 @@ export function createEventHorizonMaterial(schwarzschildRadius: number): THREE.S
     uniforms: {
       time: { value: 0.0 },
       schwarzschildRadius: { value: schwarzschildRadius },
-      glowColor: { value: new THREE.Color(0xff4400) }, // Red-orange photon sphere glow
-      glowIntensity: { value: 2.0 } // Subtle intensity for balanced bloom
+      glowColor: { value: new THREE.Color(0xff8800) }, // M87-style orange/yellow glow
+      glowIntensity: { value: 4.0 } // DOUBLED for M87-style brightness
       // cameraPosition is provided automatically by Three.js
     },
     transparent: true,
-    side: THREE.DoubleSide, // Changed from FrontSide - render both sides
-    depthWrite: false, // Changed from true - prevent z-fighting
-    blending: THREE.AdditiveBlending // Changed from NormalBlending - matches accretion disk
+    side: THREE.FrontSide, // Only render front faces for proper depth occlusion
+    depthWrite: true, // CRITICAL: Write to depth buffer to block objects behind the void!
+    blending: THREE.NormalBlending // Normal blending - we want to BLOCK the background, not add to it
   })
 }
