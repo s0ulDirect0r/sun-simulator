@@ -732,7 +732,7 @@ class SunSimulator {
         // Strength stays strong (ember still glows!) - slight increase as it expands
         this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 0.9, expansionProgress)
         // Radius increases dramatically for soft, diffuse halo
-        this.bloomPass.radius = THREE.MathUtils.lerp(0.4, 1.5, expansionProgress)
+        this.bloomPass.radius = THREE.MathUtils.lerp(0.4, 1, expansionProgress)
         // Lower threshold so red tones glow more
         this.bloomPass.threshold = THREE.MathUtils.lerp(0.85, 0.3, expansionProgress)
       } else {
