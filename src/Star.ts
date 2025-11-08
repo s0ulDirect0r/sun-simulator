@@ -905,4 +905,55 @@ export class Star {
       this.supernovaFlash = null
     }
   }
+
+  /**
+   * Debug snapshot for testing - captures current state of stellar wind particles
+   * Used by automated tests to verify visual enhancements
+   */
+  public getDebugSnapshot() {
+    const sizes = Array.from(this.surfaceGeometry.attributes.size.array as Float32Array)
+    const colors = Array.from(this.surfaceGeometry.attributes.color.array as Float32Array)
+    const positions = Array.from(this.surfaceGeometry.attributes.position.array as Float32Array)
+
+    // Calculate color averages
+    const colorValues = { r: [] as number[], g: [] as number[], b: [] as number[] }
+    for (let i = 0; i < this.surfaceCount; i++) {
+      colorValues.r.push(colors[i * 3])
+      colorValues.g.push(colors[i * 3 + 1])
+      colorValues.b.push(colors[i * 3 + 2])
+    }
+
+    const avgR = colorValues.r.reduce((a, b) => a + b, 0) / this.surfaceCount
+    const avgG = colorValues.g.reduce((a, b) => a + b, 0) / this.surfaceCount
+    const avgB = colorValues.b.reduce((a, b) => a + b, 0) / this.surfaceCount
+
+    return {
+      particleCount: this.surfaceCount,
+      colors: {
+        sample: colors.slice(0, 9), // First 3 particles RGB
+        average: { r: avgR, g: avgG, b: avgB },
+        first: { r: colors[0], g: colors[1], b: colors[2] }
+      },
+      sizes: {
+        min: Math.min(...sizes),
+        max: Math.max(...sizes),
+        average: sizes.reduce((a, b) => a + b, 0) / sizes.length,
+        sample: sizes.slice(0, 10) // First 10 particles
+      },
+      positions: {
+        sample: positions.slice(0, 9) // First 3 particles XYZ
+      },
+      shader: {
+        hasStreakCode: this.surfaceMaterial.fragmentShader.includes('coord.x * 0.3'),
+        hasBrightnessBoost: this.surfaceMaterial.fragmentShader.includes('vColor * 1.5'),
+        fragmentShaderSnippet: this.surfaceMaterial.fragmentShader.slice(0, 200)
+      },
+      state: {
+        isRedGiant: this.isRedGiant,
+        isSupernova: this.isSupernova,
+        currentRadius: this.currentRadius,
+        time: this.time
+      }
+    }
+  }
 }
