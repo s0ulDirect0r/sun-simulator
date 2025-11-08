@@ -37,7 +37,7 @@ export class Star {
   public surfaceParticles!: THREE.Points
   private surfaceGeometry!: THREE.BufferGeometry
   private surfaceMaterial!: THREE.ShaderMaterial // Custom shader for per-particle sizes
-  private surfaceCount: number = 1800 // Bright stellar wind for main sequence
+  private surfaceCount: number = 1200 // Subtle stellar wind for main sequence
   private surfacePositions!: Float32Array
   private surfaceVelocities!: Float32Array
   private surfaceSizes!: Float32Array // Per-particle size for growth effect (rendered size)
@@ -310,7 +310,7 @@ export class Star {
       this.surfaceVelocities[i3 + 2] = this.surfacePositions[i3 + 2] / this.starRadius * speed
 
       // Initialize base size (will grow with distance during red giant)
-      const baseSize = 0.8 + Math.random() * 0.7 // 0.8-1.5 base size (3x larger for visibility)
+      const baseSize = 0.5 + Math.random() * 0.5 // 0.5-1.0 base size (subtle but visible)
       this.surfaceSizes[i] = baseSize
       this.surfaceBaseSizes[i] = baseSize // Store original size for growth calculations
 
@@ -358,7 +358,7 @@ export class Star {
           alpha = pow(alpha, 0.5); // Sharper falloff = brighter core
 
           // Boost color intensity for bloom/glow effect
-          vec3 brightColor = vColor * 1.5; // Overbright for post-processing bloom
+          vec3 brightColor = vColor * 1.3; // Subtle overbright for post-processing bloom
           gl_FragColor = vec4(brightColor, alpha * opacity);
         }
       `,
@@ -726,9 +726,9 @@ export class Star {
         const sizes = this.surfaceGeometry.attributes.size.array as Float32Array
         const baseSize = this.surfaceBaseSizes[i]
 
-        // Time-based flicker with per-particle variation
-        const flickerPhase = Math.sin(this.time * 5.0 + i * 0.1) * 0.5 + 0.5 // 0-1 range
-        sizes[i] = baseSize * (0.8 + flickerPhase * 0.4) // 80%-120% size variation
+        // Time-based flicker with per-particle variation (subtle)
+        const flickerPhase = Math.sin(this.time * 3.0 + i * 0.1) * 0.5 + 0.5 // 0-1 range
+        sizes[i] = baseSize * (0.9 + flickerPhase * 0.2) // 90%-110% size variation (subtle)
       }
 
       // Update particle size and color based on distance (red giants only)
