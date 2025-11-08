@@ -13,7 +13,7 @@ import { SupernovaRemnant } from './SupernovaRemnant'
 import { AccretionSource } from './AccretionSource'
 import { FilmGrainPass } from './FilmGrainPass'
 import { VignettePass } from './VignettePass'
-// import { GravitationalLensingPass } from './GravitationalLensingPass' // DISABLED
+import { GravitationalLensingPass } from './GravitationalLensingPass'
 import { Starfield } from './Starfield'
 
 enum SimulationPhase {
@@ -30,7 +30,7 @@ class SunSimulator {
   private renderer: THREE.WebGLRenderer
   private composer: EffectComposer
   private bloomPass: UnrealBloomPass
-  // private lensingPass!: GravitationalLensingPass // DISABLED
+  private lensingPass!: GravitationalLensingPass
   private filmGrainPass!: FilmGrainPass
   private vignettePass!: VignettePass
   private ambientLight!: THREE.AmbientLight
@@ -151,15 +151,14 @@ class SunSimulator {
     this.composer.addPass(renderPass)
 
     // Add gravitational lensing pass (warps spacetime around black hole)
-    // MUST come before bloom so the warped photon ring gets bloomed beautifully
-    // DISABLED FOR NOW
-    // this.lensingPass = new GravitationalLensingPass(
-    //   new THREE.Vector2(window.innerWidth, window.innerHeight),
-    //   this.camera
-    // )
-    // this.lensingPass.setEnabled(false) // Start disabled, enable during black hole phase
-    // this.composer.addPass(this.lensingPass)
-    // console.log('🌀 [Phase 4] Gravitational lensing pass added to render pipeline')
+    // MUST come before bloom so the warped scene gets bloomed beautifully
+    this.lensingPass = new GravitationalLensingPass(
+      new THREE.Vector2(window.innerWidth, window.innerHeight),
+      this.camera
+    )
+    this.lensingPass.setEnabled(false) // Start disabled, enable during black hole phase
+    this.composer.addPass(this.lensingPass)
+    console.log('🌀 Gravitational lensing pass added to render pipeline')
 
     // Add bloom pass (makes bright things GLOW)
     this.bloomPass = new UnrealBloomPass(
@@ -236,7 +235,7 @@ class SunSimulator {
     this.composer.setSize(window.innerWidth, window.innerHeight)
 
     // Update lensing pass resolution
-    // this.lensingPass.setSize(window.innerWidth, window.innerHeight) // DISABLED
+    this.lensingPass.setSize(window.innerWidth, window.innerHeight)
   }
 
   private updatePhaseInfo(phase: string, description?: string): void {
@@ -799,8 +798,11 @@ class SunSimulator {
             this.blackHole.update(deltaTime)
 
             // Update lensing pass with black hole position and radius
-            // this.lensingPass.setBlackHolePosition(this.blackHole.getPosition()) // DISABLED
-            // this.lensingPass.setSchwarzschildRadius(this.blackHole.getEventHorizonRadius()) // DISABLED
+            this.lensingPass.setBlackHolePosition(this.blackHole.getPosition())
+            this.lensingPass.setSchwarzschildRadius(this.blackHole.getEventHorizonRadius())
+
+            // Enable lensing as black hole forms (fade in with formation)
+            this.lensingPass.setEnabled(true)
 
             const t = this.supernovaTimer
 
@@ -854,8 +856,8 @@ class SunSimulator {
           this.blackHole.setOpacity(1.0)
 
           // Update lensing pass with black hole position and radius
-          // this.lensingPass.setBlackHolePosition(this.blackHole.getPosition()) // DISABLED
-          // this.lensingPass.setSchwarzschildRadius(this.blackHole.getEventHorizonRadius()) // DISABLED
+          this.lensingPass.setBlackHolePosition(this.blackHole.getPosition())
+          this.lensingPass.setSchwarzschildRadius(this.blackHole.getEventHorizonRadius())
         }
         // Continue updating supernova remnant for accretion effect
         if (this.supernovaRemnant) {
@@ -943,8 +945,8 @@ class SunSimulator {
     }
 
     // Enable gravitational lensing pass - warp spacetime!
-    // this.lensingPass.setEnabled(false) // DISABLED
-    // console.log('🌀 [Phase 4] Gravitational lensing DISABLED')
+    this.lensingPass.setEnabled(true)
+    console.log('🌀 Gravitational lensing ENABLED - spacetime warping active')
 
     // Hide point light - no light escapes the singularity!
     this.pointLight.visible = false
