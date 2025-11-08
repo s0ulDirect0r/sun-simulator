@@ -82,27 +82,12 @@ void main() {
   float edgeFade = 1.0 - smoothstep(0.5, 1.0, distFromAxis);
   edgeFade = pow(edgeFade, 2.0); // Sharper falloff
 
-  // FLOWING EFFECT: Continuous plasma with organic turbulence
-  // Multi-scale noise for natural plasma variation (no artificial bands)
-  vec3 flowingNoisePos = vec3(
-    vWorldPosition.x,
-    vWorldPosition.y - time * flowSpeed, // Flows outward
-    vWorldPosition.z
-  ) * 0.15;
-  float flowingNoise = noise(flowingNoisePos);
+  // Smooth continuous beam - NO banding or stripes
+  // Only gentle pulse at base for subtle aliveness
+  float basePulse = sin(time * 2.0) * 0.08 + 0.92; // Very subtle pulse (0.84-1.0)
 
-  // Add finer detail with higher frequency noise
-  vec3 detailNoisePos = flowingNoisePos * 2.5;
-  float detailNoise = noise(detailNoisePos);
-
-  // Combine multiple noise scales for organic, continuous variation
-  float turbulence = flowingNoise * 0.6 + detailNoise * 0.2 + 0.5;
-
-  // Pulsing glow at the base
-  float basePulse = (1.0 - distAlongJet) * (sin(time * 2.0) * 0.2 + 0.8);
-
-  // Combine all factors
-  float brightness = distanceFade * edgeFade * turbulence * basePulse * glowIntensity;
+  // Combine all factors - smooth gradient only
+  float brightness = distanceFade * edgeFade * basePulse * glowIntensity;
 
   // Final color
   vec3 finalColor = coreColor * brightness;
@@ -125,7 +110,7 @@ export function createJetTrailMaterial(jetLength: number): THREE.ShaderMaterial 
       time: { value: 0.0 },
       jetLength: { value: jetLength },
       coreColor: { value: new THREE.Color(0x88ccff) }, // Softer blue-white
-      glowIntensity: { value: 2.0 }, // Base glow - scales up with mass
+      glowIntensity: { value: 1.2 }, // Base glow - scales up with mass (reduced for subtlety)
       opacity: { value: 0.8 }, // Visible but balanced
       flowSpeed: { value: 6.0 }, // Keep the nice flowing motion
     },
