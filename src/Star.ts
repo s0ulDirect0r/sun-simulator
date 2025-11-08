@@ -48,7 +48,7 @@ export class Star {
   public streakParticles!: THREE.Points
   private streakGeometry!: THREE.BufferGeometry
   private streakMaterial!: THREE.ShaderMaterial
-  private streakCount: number = 600 // Fast energy bursts
+  private streakCount: number = 300 // Fast energy bursts (reduced for subtlety)
   private streakPositions!: Float32Array
   private streakVelocities!: Float32Array
   private streakSizes!: Float32Array
@@ -56,7 +56,7 @@ export class Star {
 
   // Layer 3: Hero light beams (dramatic rays)
   public heroBeams!: THREE.Group
-  private beamCount: number = 12 // Occasional dramatic rays
+  private beamCount: number = 24 // Frequent dramatic rays
   private beamMeshes: THREE.Mesh[] = []
   private beamOpacities: number[] = []
   private beamPulsePhases: number[] = []
@@ -1024,16 +1024,16 @@ export class Star {
     // Update Layer 3: Hero beams (main sequence only)
     if (!this.isRedGiant && !this.isSupernova) {
       for (let i = 0; i < this.beamCount; i++) {
-        // Update pulse phase
-        this.beamPulsePhases[i] += deltaTime * 0.5 // Slow pulsing
+        // Update pulse phase (faster pulsing for more frequent beams)
+        this.beamPulsePhases[i] += deltaTime * 1.0
 
-        // Occasional pulses (sine wave with random phase)
+        // Frequent pulses (sine wave with random phase)
         const pulseBrightness = Math.sin(this.beamPulsePhases[i]) * 0.5 + 0.5 // 0-1
 
-        // Only show beams occasionally (when pulse > 0.7)
+        // Show beams more frequently (when pulse > 0.4 instead of 0.7)
         let targetOpacity = 0.0
-        if (pulseBrightness > 0.7) {
-          targetOpacity = (pulseBrightness - 0.7) / 0.3 * 0.4 // 0-0.4 max opacity (subtle)
+        if (pulseBrightness > 0.4) {
+          targetOpacity = (pulseBrightness - 0.4) / 0.6 * 0.5 // 0-0.5 max opacity (more visible)
         }
 
         // Smooth opacity transitions
