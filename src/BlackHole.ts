@@ -142,9 +142,9 @@ export class BlackHole {
 
   private createJets(): void {
     // Create shader-based jet beams (cone geometry for realistic narrowing)
-    // Jet radius proportional to event horizon: ~20% at base, ~50% at tip (physically inspired)
-    const baseRadius = this.blackHoleRadius * 0.20   // 20% of event horizon radius
-    const tipRadius = this.blackHoleRadius * 0.50    // 50% of event horizon radius at tip
+    // Jet radius proportional to event horizon: ~5% at base, ~12.5% at tip (physically inspired)
+    const baseRadius = this.blackHoleRadius * 0.05   // 5% of event horizon radius
+    const tipRadius = this.blackHoleRadius * 0.125   // 12.5% of event horizon radius at tip
     const radialSegments = 16
     const heightSegments = 32 // Segments along length for smooth animation
 
@@ -213,9 +213,9 @@ export class BlackHole {
       // Fade in accretion disk via shader uniform
       this.accretionDiskMaterial.uniforms.globalOpacity.value = this.formationProgress * 1.0
 
-      // Fade in jets via shader uniform - DISABLED
-      this.jetMaterial.uniforms.opacity.value = 0.0
-      ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = 0.0
+      // Fade in jets via shader uniform
+      this.jetMaterial.uniforms.opacity.value = this.formationProgress * 0.8
+      ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = this.formationProgress * 0.8
     }
 
     // Update jet shaders
@@ -262,12 +262,11 @@ export class BlackHole {
     this.jetBottom.scale.y = 1.0 // Keep length constant
 
     // Increase jet brightness with mass (more energetic accretion = brighter jets)
-    // Scale from 2.0 to 4.5 intensity as mass goes from 1.0 to 3.0
-    // DISABLED - Jets turned off
-    // const massScale = Math.min(this.currentMass, 3.0)
-    // const glowScale = 2.0 + (massScale - 1.0) * 1.25
-    // this.jetMaterial.uniforms.glowIntensity.value = glowScale
-    // ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.glowIntensity.value = glowScale
+    // Scale from 1.2 to 2.5 intensity as mass goes from 1.0 to 3.0 (more subtle plasma beams)
+    const massScale = Math.min(this.currentMass, 3.0)
+    const glowScale = 1.2 + (massScale - 1.0) * 0.65
+    this.jetMaterial.uniforms.glowIntensity.value = glowScale
+    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.glowIntensity.value = glowScale
 
     // Only log every 0.1 mass increase to reduce console spam
     if (this.currentMass - this.lastLoggedMass >= 0.1) {
@@ -311,9 +310,9 @@ export class BlackHole {
     // Accretion disk opacity via shader uniform
     this.accretionDiskMaterial.uniforms.globalOpacity.value = opacity * 1.0
 
-    // Jets opacity via shader uniforms - DISABLED
-    this.jetMaterial.uniforms.opacity.value = 0.0
-    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = 0.0
+    // Jets opacity via shader uniforms
+    this.jetMaterial.uniforms.opacity.value = opacity * 0.8
+    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = opacity * 0.8
   }
 
   // Separate control for staged formation (physically accurate)
@@ -332,10 +331,9 @@ export class BlackHole {
     this.accretionDiskMaterial.uniforms.globalOpacity.value = opacity * 1.0
   }
 
-  public setJetOpacity(_opacity: number): void {
-    // Jets disabled - opacity parameter intentionally unused
-    this.jetMaterial.uniforms.opacity.value = 0.0
-    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = 0.0
+  public setJetOpacity(opacity: number): void {
+    this.jetMaterial.uniforms.opacity.value = opacity * 0.8
+    ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = opacity * 0.8
   }
 
   public getPosition(): Vector3 {
