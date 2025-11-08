@@ -4,6 +4,7 @@ import { createEventHorizonMaterial } from './shaders/EventHorizonShader'
 import { createAccretionDiskMaterial } from './shaders/AccretionDiskShader'
 import { createJetTrailMaterial } from './shaders/JetTrailShader'
 import { createPhotonCoronaMaterial } from './shaders/PhotonCoronaShader'
+import { createPhotonRingMaterial } from './shaders/PhotonRingShader'
 
 export class BlackHole {
   private scene: THREE.Scene
@@ -20,8 +21,9 @@ export class BlackHole {
   private jetMaterial!: THREE.ShaderMaterial
   private jetLength: number = 250.0 // Extend far into space for dramatic reach
 
-  // Gravitational lensing ring
+  // Gravitational lensing ring (photon sphere)
   public lensingRing!: THREE.Mesh // Public for debug toggles
+  private lensingRingMaterial!: THREE.ShaderMaterial
 
   private time: number = 0
   private blackHoleRadius: number = 12.0 // Schwarzschild radius (scaled up for dramatic visibility)
@@ -84,25 +86,34 @@ export class BlackHole {
   }
 
   private createLensingRing(): void {
-    // Gravitational lensing creates a bright ring around the event horizon
+    // Photon sphere at 1.5× Schwarzschild radius - where light can orbit the black hole
+    // Create multi-layered Einstein ring with dramatic shader effects
+    const innerRadius = this.blackHoleRadius * 1.4  // 16.8 units - slightly inside photon sphere
+    const outerRadius = this.blackHoleRadius * 2.2  // 26.4 units - extended for more drama
+
     const geometry = new THREE.RingGeometry(
-      this.blackHoleRadius * 1.5,
-      this.blackHoleRadius * 2.0,
-      64
+      innerRadius,
+      outerRadius,
+      128, // Higher resolution for smooth shader effects
+      8
     )
-    const material = new THREE.MeshBasicMaterial({
-      color: 0xffffff,
-      transparent: true,
-      opacity: 0.0, // Start invisible
-      side: THREE.DoubleSide,
-      blending: THREE.AdditiveBlending,
-    })
 
-    this.lensingRing = new THREE.Mesh(geometry, material)
+    // Use new photon ring shader material
+    this.lensingRingMaterial = createPhotonRingMaterial(this.blackHoleRadius)
+    this.lensingRingMaterial.uniforms.intensity.value = 0.0 // Start invisible (fade in during formation)
 
-    // Orient rings at multiple angles for 3D lensing effect
+    this.lensingRing = new THREE.Mesh(geometry, this.lensingRingMaterial)
+
+    // Orient ring horizontally around black hole
     this.lensingRing.rotation.x = Math.PI / 2
+
+    // Render order - visible above accretion disk
+    this.lensingRing.renderOrder = 3
+
     this.scene.add(this.lensingRing)
+
+    console.log(`⭕ Photon ring (Einstein ring) created: inner=${innerRadius}, outer=${outerRadius}`)
+    console.log(`   Photon sphere at 1.5× Rs = ${this.blackHoleRadius * 1.5} units`)
   }
 
   private createAccretionDisk(): void {
@@ -196,8 +207,8 @@ export class BlackHole {
       // Fade in photon corona (glowing shell)
       this.photonCoronaMaterial.uniforms.glowIntensity.value = this.formationProgress * 6.0
 
-      const lensingMaterial = this.lensingRing.material as THREE.MeshBasicMaterial
-      lensingMaterial.opacity = 0.0 // Lensing ring disabled
+      // Fade in photon ring via shader intensity uniform
+      this.lensingRingMaterial.uniforms.intensity.value = this.formationProgress * 1.5
 
       // Fade in accretion disk via shader uniform
       this.accretionDiskMaterial.uniforms.globalOpacity.value = this.formationProgress * 1.0
@@ -212,14 +223,14 @@ export class BlackHole {
     // Bottom jet uses cloned material, update it too
     ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.time.value = this.time
 
-    // Pulse lensing ring
-    const lensingMaterial = this.lensingRing.material as THREE.MeshBasicMaterial
-    if (!this.isForming) {
-      lensingMaterial.opacity = 0.4 + Math.sin(this.time * 2) * 0.2
-    }
+    // Update photon ring shader
+    this.lensingRingMaterial.uniforms.time.value = this.time
 
     // Subtle rotation of event horizon (for effect)
     this.eventHorizon.rotation.y += deltaTime * 0.1
+
+    // Subtle rotation of photon ring (opposite direction for visual interest)
+    this.lensingRing.rotation.z += deltaTime * 0.05
   }
 
   public addMass(deltaMass: number): void {
@@ -294,8 +305,8 @@ export class BlackHole {
     // Photon corona (glowing shell)
     this.photonCoronaMaterial.uniforms.glowIntensity.value = opacity * 6.0
 
-    const lensingMaterial = this.lensingRing.material as THREE.MeshBasicMaterial
-    lensingMaterial.opacity = 0.0 // Lensing ring disabled
+    // Photon ring opacity via shader intensity uniform
+    this.lensingRingMaterial.uniforms.intensity.value = opacity * 1.5
 
     // Accretion disk opacity via shader uniform
     this.accretionDiskMaterial.uniforms.globalOpacity.value = opacity * 1.0
@@ -313,8 +324,8 @@ export class BlackHole {
     // Photon corona fades in with event horizon
     this.photonCoronaMaterial.uniforms.glowIntensity.value = opacity * 6.0
 
-    const lensingMaterial = this.lensingRing.material as THREE.MeshBasicMaterial
-    lensingMaterial.opacity = 0.0 // Lensing ring disabled
+    // Photon ring fades in with event horizon
+    this.lensingRingMaterial.uniforms.intensity.value = opacity * 1.5
   }
 
   public setAccretionDiskOpacity(opacity: number): void {
@@ -345,8 +356,9 @@ export class BlackHole {
     this.jetBottom.geometry.dispose()
     ;(this.jetBottom.material as THREE.Material).dispose()
 
+    // Dispose photon ring shader
     this.lensingRing.geometry.dispose()
-    ;(this.lensingRing.material as THREE.Material).dispose()
+    this.lensingRingMaterial.dispose()
 
     this.scene.remove(this.eventHorizon)
     this.scene.remove(this.photonCorona)
