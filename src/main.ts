@@ -724,14 +724,22 @@ class SunSimulator {
       if (shakeIntensity > 0) {
         // Supernova: bloom gets INSANE (0.8 base → 3.5 peak)
         this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 3.5, shakeIntensity)
+        this.bloomPass.radius = 0.4 // Reset radius for supernova
+        this.bloomPass.threshold = 0.85 // Reset threshold for supernova
       } else if (this.star.isInRedGiantPhase()) {
-        // Red giant: reduce bloom as star cools and reddens
+        // Red giant: soft, diffuse ember glow - larger radius, lower threshold
         const expansionProgress = this.star.getExpansionProgress()
-        // Start at 0.8 (main sequence bloom), reduce to 0.5 (cooler red giant)
-        this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 0.5, expansionProgress)
+        // Strength stays strong (ember still glows!) - slight increase as it expands
+        this.bloomPass.strength = THREE.MathUtils.lerp(0.8, 0.9, expansionProgress)
+        // Radius increases dramatically for soft, diffuse halo
+        this.bloomPass.radius = THREE.MathUtils.lerp(0.4, 1, expansionProgress)
+        // Lower threshold so red tones glow more
+        this.bloomPass.threshold = THREE.MathUtils.lerp(0.85, 0.3, expansionProgress)
       } else {
         // Main sequence: normal bloom
         this.bloomPass.strength = 0.8
+        this.bloomPass.radius = 0.4
+        this.bloomPass.threshold = 0.85
       }
     }
 
