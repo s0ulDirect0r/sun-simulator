@@ -37,7 +37,7 @@ export class Star {
   public surfaceParticles!: THREE.Points
   private surfaceGeometry!: THREE.BufferGeometry
   private surfaceMaterial!: THREE.ShaderMaterial // Custom shader for per-particle sizes
-  private surfaceCount: number = 900 // Balanced stellar wind
+  private surfaceCount: number = 1800 // Bright stellar wind for main sequence
   private surfacePositions!: Float32Array
   private surfaceVelocities!: Float32Array
   private surfaceSizes!: Float32Array // Per-particle size for growth effect (rendered size)
@@ -310,14 +310,14 @@ export class Star {
       this.surfaceVelocities[i3 + 2] = this.surfacePositions[i3 + 2] / this.starRadius * speed
 
       // Initialize base size (will grow with distance during red giant)
-      const baseSize = 0.3 + Math.random() * 0.3 // 0.3-0.6 base size
+      const baseSize = 0.8 + Math.random() * 0.7 // 0.8-1.5 base size (3x larger for visibility)
       this.surfaceSizes[i] = baseSize
       this.surfaceBaseSizes[i] = baseSize // Store original size for growth calculations
 
-      // Initialize color (will fade with distance during red giant)
+      // Initialize color - bright yellow-white for main sequence photons
       this.surfaceColors[i3] = 1.0     // R
-      this.surfaceColors[i3 + 1] = 0.6 // G (orange-ish)
-      this.surfaceColors[i3 + 2] = 0.2 // B
+      this.surfaceColors[i3 + 1] = 0.98 // G (nearly white)
+      this.surfaceColors[i3 + 2] = 0.85 // B (slight warm tint)
     }
 
     this.surfaceGeometry.setAttribute('position', new THREE.BufferAttribute(this.surfacePositions, 3))
@@ -348,14 +348,18 @@ export class Star {
         varying vec3 vColor;
 
         void main() {
-          // Circular point shape
-          vec2 center = gl_PointCoord - vec2(0.5);
-          float dist = length(center);
-          if (dist > 0.5) discard;
+          // Create velocity-based streak (compressed X = elongated appearance)
+          vec2 coord = gl_PointCoord - vec2(0.5);
+          float streak = length(vec2(coord.x * 0.3, coord.y)); // Compress X to create streak
+          if (streak > 0.5) discard;
 
-          // Soft edge
-          float alpha = 1.0 - smoothstep(0.3, 0.5, dist);
-          gl_FragColor = vec4(vColor, alpha * opacity);
+          // Bright core with soft edges for photon-like appearance
+          float alpha = 1.0 - smoothstep(0.1, 0.5, streak);
+          alpha = pow(alpha, 0.5); // Sharper falloff = brighter core
+
+          // Boost color intensity for bloom/glow effect
+          vec3 brightColor = vColor * 1.5; // Overbright for post-processing bloom
+          gl_FragColor = vec4(brightColor, alpha * opacity);
         }
       `,
       transparent: true,
@@ -717,6 +721,16 @@ export class Star {
         positions[i3 + 2] ** 2
       )
 
+      // Add flickering effect for main sequence stellar wind (photon-like pulsing)
+      if (!this.isRedGiant && !this.isSupernova) {
+        const sizes = this.surfaceGeometry.attributes.size.array as Float32Array
+        const baseSize = this.surfaceBaseSizes[i]
+
+        // Time-based flicker with per-particle variation
+        const flickerPhase = Math.sin(this.time * 5.0 + i * 0.1) * 0.5 + 0.5 // 0-1 range
+        sizes[i] = baseSize * (0.8 + flickerPhase * 0.4) // 80%-120% size variation
+      }
+
       // Update particle size and color based on distance (red giants only)
       if (this.isRedGiant && !this.isSupernova) {
         const sizes = this.surfaceGeometry.attributes.size.array as Float32Array
@@ -764,8 +778,12 @@ export class Star {
     }
 
     this.surfaceGeometry.attributes.position.needsUpdate = true
-    if (this.isRedGiant && !this.isSupernova) {
+    // Update size for both main sequence (flickering) and red giants (growth)
+    if (!this.isSupernova) {
       this.surfaceGeometry.attributes.size.needsUpdate = true
+    }
+    // Update color for red giants only (color fading with distance)
+    if (this.isRedGiant && !this.isSupernova) {
       this.surfaceGeometry.attributes.color.needsUpdate = true
     }
   }
