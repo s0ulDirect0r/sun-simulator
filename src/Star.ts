@@ -44,6 +44,23 @@ export class Star {
   private surfaceBaseSizes!: Float32Array // Original spawn sizes (never modified, used for growth calculation)
   private surfaceColors!: Float32Array // Per-particle colors (RGB, fades with distance)
 
+  // Layer 2: Energy streak particles (fast, bright bursts)
+  public streakParticles!: THREE.Points
+  private streakGeometry!: THREE.BufferGeometry
+  private streakMaterial!: THREE.ShaderMaterial
+  private streakCount: number = 600 // Fast energy bursts
+  private streakPositions!: Float32Array
+  private streakVelocities!: Float32Array
+  private streakSizes!: Float32Array
+  private streakColors!: Float32Array
+
+  // Layer 3: Hero light beams (dramatic rays)
+  public heroBeams!: THREE.Group
+  private beamCount: number = 12 // Occasional dramatic rays
+  private beamMeshes: THREE.Mesh[] = []
+  private beamOpacities: number[] = []
+  private beamPulsePhases: number[] = []
+
   private starRadius: number = 4.0 // Main sequence star - compact and stable
   private initialRadius: number // Start size (from protostar)
   private currentRadius: number // Current size during contraction
@@ -94,6 +111,12 @@ export class Star {
 
     // Create surface activity particles (flares, ejections)
     this.createSurfaceActivity()
+
+    // Create streak particles (Layer 2 - energy bursts)
+    this.createStreakParticles()
+
+    // Create hero beams (Layer 3 - dramatic rays)
+    this.createHeroBeams()
 
     // Create surface texture particles (for mottled red giant appearance)
     this.createSurfaceTexture()
@@ -369,6 +392,177 @@ export class Star {
 
     this.surfaceParticles = new THREE.Points(this.surfaceGeometry, this.surfaceMaterial)
     this.scene.add(this.surfaceParticles)
+  }
+
+  private createStreakParticles(): void {
+    // Layer 2: Fast, bright energy bursts
+    this.streakGeometry = new THREE.BufferGeometry()
+    this.streakPositions = new Float32Array(this.streakCount * 3)
+    this.streakVelocities = new Float32Array(this.streakCount * 3)
+    this.streakSizes = new Float32Array(this.streakCount)
+    this.streakColors = new Float32Array(this.streakCount * 3)
+
+    // Create faster-moving particles with whiter colors
+    for (let i = 0; i < this.streakCount; i++) {
+      const i3 = i * 3
+
+      // Random position on star surface
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.acos(2 * Math.random() - 1)
+
+      this.streakPositions[i3] = this.starRadius * Math.sin(phi) * Math.cos(theta)
+      this.streakPositions[i3 + 1] = this.starRadius * Math.sin(phi) * Math.sin(theta)
+      this.streakPositions[i3 + 2] = this.starRadius * Math.cos(phi)
+
+      // Faster velocities than base particles (2-3x speed)
+      const speed = 0.08 + Math.random() * 0.12 // 0.08-0.20 (vs base 0.03-0.11)
+      this.streakVelocities[i3] = this.streakPositions[i3] / this.starRadius * speed
+      this.streakVelocities[i3 + 1] = this.streakPositions[i3 + 1] / this.starRadius * speed
+      this.streakVelocities[i3 + 2] = this.streakPositions[i3 + 2] / this.starRadius * speed
+
+      // Smaller size for streaks (0.3-0.6)
+      this.streakSizes[i] = 0.3 + Math.random() * 0.3
+
+      // Brighter white color
+      this.streakColors[i3] = 1.0     // R
+      this.streakColors[i3 + 1] = 1.0 // G (pure white)
+      this.streakColors[i3 + 2] = 0.95 // B (very slight warm)
+    }
+
+    this.streakGeometry.setAttribute('position', new THREE.BufferAttribute(this.streakPositions, 3))
+    this.streakGeometry.setAttribute('size', new THREE.BufferAttribute(this.streakSizes, 1))
+    this.streakGeometry.setAttribute('color', new THREE.BufferAttribute(this.streakColors, 3))
+
+    // Use elongated streak shader (more aggressive than base particles)
+    this.streakMaterial = new THREE.ShaderMaterial({
+      uniforms: {
+        opacity: { value: 1.0 }
+      },
+      vertexShader: `
+        attribute float size;
+        attribute vec3 color;
+        varying float vSize;
+        varying vec3 vColor;
+
+        void main() {
+          vSize = size;
+          vColor = color;
+          vec4 mvPosition = modelViewMatrix * vec4(position, 1.0);
+          gl_PointSize = size * (300.0 / -mvPosition.z);
+          gl_Position = projectionMatrix * mvPosition;
+        }
+      `,
+      fragmentShader: `
+        uniform float opacity;
+        varying vec3 vColor;
+
+        void main() {
+          // Aggressive streak (more elongated than base particles)
+          vec2 coord = gl_PointCoord - vec2(0.5);
+          float streak = length(vec2(coord.x * 0.15, coord.y)); // Heavy X compression
+          if (streak > 0.5) discard;
+
+          // Sharp bright core
+          float alpha = 1.0 - smoothstep(0.05, 0.5, streak);
+          alpha = pow(alpha, 0.3); // Very sharp falloff
+
+          // Brighter boost for streaks
+          vec3 brightColor = vColor * 1.6;
+          gl_FragColor = vec4(brightColor, alpha * opacity);
+        }
+      `,
+      transparent: true,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false
+    })
+
+    this.streakParticles = new THREE.Points(this.streakGeometry, this.streakMaterial)
+    this.scene.add(this.streakParticles)
+  }
+
+  private createHeroBeams(): void {
+    // Layer 3: Dramatic light rays
+    this.heroBeams = new THREE.Group()
+
+    for (let i = 0; i < this.beamCount; i++) {
+      // Random direction from star center
+      const theta = Math.random() * Math.PI * 2
+      const phi = Math.acos(2 * Math.random() - 1)
+
+      const dirX = Math.sin(phi) * Math.cos(theta)
+      const dirY = Math.sin(phi) * Math.sin(theta)
+      const dirZ = Math.cos(phi)
+
+      // Create elongated beam geometry (thin cylinder/cone)
+      const beamLength = 15 + Math.random() * 10 // 15-25 units long
+      const beamWidth = 0.15 + Math.random() * 0.1 // 0.15-0.25 wide
+
+      const geometry = new THREE.CylinderGeometry(beamWidth, beamWidth * 0.3, beamLength, 8, 1, true)
+
+      // Custom shader material for beam glow
+      const material = new THREE.ShaderMaterial({
+        uniforms: {
+          opacity: { value: 0.0 }, // Start invisible, will animate
+          time: { value: 0 }
+        },
+        vertexShader: `
+          varying vec2 vUv;
+          void main() {
+            vUv = uv;
+            gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+          }
+        `,
+        fragmentShader: `
+          uniform float opacity;
+          uniform float time;
+          varying vec2 vUv;
+
+          void main() {
+            // Fade from center to edges
+            float radialFade = 1.0 - abs(vUv.x - 0.5) * 2.0;
+            radialFade = pow(radialFade, 2.0);
+
+            // Fade along length (bright at base, fade to tip)
+            float lengthFade = 1.0 - vUv.y;
+            lengthFade = pow(lengthFade, 1.5);
+
+            float alpha = radialFade * lengthFade * opacity;
+
+            // Yellow-white color
+            vec3 color = vec3(1.0, 0.98, 0.85);
+            gl_FragColor = vec4(color, alpha);
+          }
+        `,
+        transparent: true,
+        blending: THREE.AdditiveBlending,
+        depthWrite: false,
+        side: THREE.DoubleSide
+      })
+
+      const beam = new THREE.Mesh(geometry, material)
+
+      // Position at star surface
+      beam.position.set(
+        dirX * this.starRadius,
+        dirY * this.starRadius,
+        dirZ * this.starRadius
+      )
+
+      // Orient beam outward
+      beam.lookAt(
+        dirX * (this.starRadius + beamLength),
+        dirY * (this.starRadius + beamLength),
+        dirZ * (this.starRadius + beamLength)
+      )
+      beam.rotateX(Math.PI / 2) // Cylinder default is Y-up
+
+      this.heroBeams.add(beam)
+      this.beamMeshes.push(beam)
+      this.beamOpacities.push(0.0)
+      this.beamPulsePhases.push(Math.random() * Math.PI * 2) // Random phase offset
+    }
+
+    this.scene.add(this.heroBeams)
   }
 
   public update(deltaTime: number): void {
@@ -786,6 +980,87 @@ export class Star {
     if (this.isRedGiant && !this.isSupernova) {
       this.surfaceGeometry.attributes.color.needsUpdate = true
     }
+
+    // Update Layer 2: Streak particles (main sequence only)
+    if (!this.isRedGiant && !this.isSupernova) {
+      const streakPositions = this.streakGeometry.attributes.position.array as Float32Array
+      const streakVelocities = this.streakVelocities
+
+      for (let i = 0; i < this.streakCount; i++) {
+        const i3 = i * 3
+
+        // Update positions (faster movement)
+        streakPositions[i3] += streakVelocities[i3]
+        streakPositions[i3 + 1] += streakVelocities[i3 + 1]
+        streakPositions[i3 + 2] += streakVelocities[i3 + 2]
+
+        // Calculate distance from center
+        const distance = Math.sqrt(
+          streakPositions[i3] ** 2 +
+          streakPositions[i3 + 1] ** 2 +
+          streakPositions[i3 + 2] ** 2
+        )
+
+        // Reset particles that go too far (shorter travel than base particles)
+        if (distance > this.currentRadius * 10) { // Streaks don't travel as far
+          const theta = Math.random() * Math.PI * 2
+          const phi = Math.acos(2 * Math.random() - 1)
+
+          const spawnRadius = this.currentRadius
+          streakPositions[i3] = spawnRadius * Math.sin(phi) * Math.cos(theta)
+          streakPositions[i3 + 1] = spawnRadius * Math.sin(phi) * Math.sin(theta)
+          streakPositions[i3 + 2] = spawnRadius * Math.cos(phi)
+
+          const speed = 0.08 + Math.random() * 0.12
+          streakVelocities[i3] = (streakPositions[i3] / spawnRadius) * speed
+          streakVelocities[i3 + 1] = (streakPositions[i3 + 1] / spawnRadius) * speed
+          streakVelocities[i3 + 2] = (streakPositions[i3 + 2] / spawnRadius) * speed
+        }
+      }
+
+      this.streakGeometry.attributes.position.needsUpdate = true
+    }
+
+    // Update Layer 3: Hero beams (main sequence only)
+    if (!this.isRedGiant && !this.isSupernova) {
+      for (let i = 0; i < this.beamCount; i++) {
+        // Update pulse phase
+        this.beamPulsePhases[i] += deltaTime * 0.5 // Slow pulsing
+
+        // Occasional pulses (sine wave with random phase)
+        const pulseBrightness = Math.sin(this.beamPulsePhases[i]) * 0.5 + 0.5 // 0-1
+
+        // Only show beams occasionally (when pulse > 0.7)
+        let targetOpacity = 0.0
+        if (pulseBrightness > 0.7) {
+          targetOpacity = (pulseBrightness - 0.7) / 0.3 * 0.4 // 0-0.4 max opacity (subtle)
+        }
+
+        // Smooth opacity transitions
+        this.beamOpacities[i] += (targetOpacity - this.beamOpacities[i]) * deltaTime * 3.0
+
+        // Update material uniform
+        const material = this.beamMeshes[i].material as THREE.ShaderMaterial
+        material.uniforms.opacity.value = this.beamOpacities[i]
+      }
+    }
+
+    // Fade out streak particles and hero beams during red giant/supernova
+    if (this.isRedGiant || this.isSupernova) {
+      // Fade out streaks
+      const streakMat = this.streakMaterial
+      streakMat.uniforms.opacity.value = Math.max(0, streakMat.uniforms.opacity.value - deltaTime * 2.0)
+
+      // Fade out beams
+      for (let i = 0; i < this.beamCount; i++) {
+        this.beamOpacities[i] = Math.max(0, this.beamOpacities[i] - deltaTime * 2.0)
+        const material = this.beamMeshes[i].material as THREE.ShaderMaterial
+        material.uniforms.opacity.value = this.beamOpacities[i]
+      }
+    } else {
+      // Ensure streak opacity is full during main sequence
+      this.streakMaterial.uniforms.opacity.value = 1.0
+    }
   }
 
   public startRedGiantExpansion(): void {
@@ -877,6 +1152,8 @@ export class Star {
     this.scene.remove(this.surfaceTexture)
     this.scene.remove(this.corona)
     this.scene.remove(this.surfaceParticles)
+    this.scene.remove(this.streakParticles)
+    this.scene.remove(this.heroBeams)
     this.scene.remove(this.redGiantInnerLayer)
     this.scene.remove(this.redGiantMidLayer)
     this.scene.remove(this.redGiantOuterLayer)
@@ -890,6 +1167,8 @@ export class Star {
     this.coronaMaterial.dispose()
     this.surfaceGeometry.dispose()
     this.surfaceMaterial.dispose()
+    this.streakGeometry.dispose()
+    this.streakMaterial.dispose()
     this.surfaceTextureGeometry.dispose()
     this.surfaceTextureMaterial.dispose()
     this.redGiantInnerLayer.geometry.dispose()
@@ -898,6 +1177,12 @@ export class Star {
     ;(this.redGiantMidLayer.material as THREE.Material).dispose()
     this.redGiantOuterLayer.geometry.dispose()
     ;(this.redGiantOuterLayer.material as THREE.Material).dispose()
+
+    // Dispose hero beams
+    for (const beam of this.beamMeshes) {
+      beam.geometry.dispose()
+      ;(beam.material as THREE.Material).dispose()
+    }
 
     // Dispose supernova flash if it exists
     if (this.supernovaFlash) {
