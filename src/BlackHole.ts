@@ -332,8 +332,8 @@ export class BlackHole {
     this.accretionDiskMaterial.uniforms.globalOpacity.value = opacity * 1.0
   }
 
-  public setJetOpacity(opacity: number): void {
-    // Jets disabled
+  public setJetOpacity(_opacity: number): void {
+    // Jets disabled - opacity parameter intentionally unused
     this.jetMaterial.uniforms.opacity.value = 0.0
     ;(this.jetBottom.material as THREE.ShaderMaterial).uniforms.opacity.value = 0.0
   }

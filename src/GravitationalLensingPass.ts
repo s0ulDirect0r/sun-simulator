@@ -174,7 +174,7 @@ export class GravitationalLensingPass extends Pass {
     renderer: any,
     writeBuffer: any,
     readBuffer: any,
-    deltaTime: number
+    _deltaTime: number
   ): void {
     this.material.uniforms.tDiffuse.value = readBuffer.texture
 
