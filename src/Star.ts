@@ -48,7 +48,7 @@ export class Star {
   public streakParticles!: THREE.Points
   private streakGeometry!: THREE.BufferGeometry
   private streakMaterial!: THREE.ShaderMaterial
-  private streakCount: number = 100 // Fast energy bursts (reduced for subtlety)
+  private streakCount: number = 300 // Fast energy bursts (reduced for subtlety)
   private streakPositions!: Float32Array
   private streakVelocities!: Float32Array
   private streakSizes!: Float32Array

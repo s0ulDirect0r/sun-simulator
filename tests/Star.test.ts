@@ -12,14 +12,14 @@ describe('Star - Phase 2 Stellar Wind Enhancements', () => {
   })
 
   describe('Particle Count', () => {
-    it('should have 1800 particles in stellar wind (doubled from 900)', () => {
+    it('should have 1200 particles in stellar wind (sweet spot between 900 and 1800)', () => {
       const particleCount = star.surfaceParticles.geometry.attributes.position.count
-      expect(particleCount).toBe(1800)
+      expect(particleCount).toBe(1200)
     })
 
     it('should match internal surfaceCount property', () => {
       const snapshot = star.getDebugSnapshot()
-      expect(snapshot.particleCount).toBe(1800)
+      expect(snapshot.particleCount).toBe(1200)
     })
   })
 
@@ -46,28 +46,28 @@ describe('Star - Phase 2 Stellar Wind Enhancements', () => {
     })
   })
 
-  describe('Particle Sizes - 3x Larger', () => {
-    it('should have larger particle sizes (0.8-1.5 range)', () => {
+  describe('Particle Sizes - Larger but Subtle', () => {
+    it('should have larger particle sizes (0.5-1.0 range)', () => {
       const snapshot = star.getDebugSnapshot()
 
       // Check min/max bounds
-      expect(snapshot.sizes.min).toBeGreaterThanOrEqual(0.8)
-      expect(snapshot.sizes.max).toBeLessThanOrEqual(1.5)
+      expect(snapshot.sizes.min).toBeGreaterThanOrEqual(0.5)
+      expect(snapshot.sizes.max).toBeLessThanOrEqual(1.0)
     })
 
-    it('should have average size around 1.15 (midpoint of 0.8-1.5)', () => {
+    it('should have average size around 0.75 (midpoint of 0.5-1.0)', () => {
       const snapshot = star.getDebugSnapshot()
 
       // Average should be roughly in the middle of the range
-      expect(snapshot.sizes.average).toBeGreaterThan(1.0)
-      expect(snapshot.sizes.average).toBeLessThan(1.3)
+      expect(snapshot.sizes.average).toBeGreaterThan(0.6)
+      expect(snapshot.sizes.average).toBeLessThan(0.9)
     })
 
-    it('should be approximately 3x larger than old sizes (0.3-0.6)', () => {
+    it('should be approximately 1.5-2x larger than old sizes (0.3-0.6)', () => {
       const snapshot = star.getDebugSnapshot()
 
-      // Old average was ~0.45, new should be ~1.15
-      expect(snapshot.sizes.average).toBeGreaterThan(0.45 * 2.5) // At least 2.5x larger
+      // Old average was ~0.45, new should be ~0.75
+      expect(snapshot.sizes.average).toBeGreaterThan(0.45 * 1.4) // At least 1.4x larger
     })
   })
 
@@ -79,10 +79,12 @@ describe('Star - Phase 2 Stellar Wind Enhancements', () => {
       expect(snapshot.shader.hasStreakCode).toBe(true)
     })
 
-    it('should boost color intensity by 1.5x for bloom', () => {
-      const snapshot = star.getDebugSnapshot()
+    it('should boost color intensity by 1.3x for bloom', () => {
+      const material = star.surfaceParticles.material as THREE.ShaderMaterial
 
-      expect(snapshot.shader.hasBrightnessBoost).toBe(true)
+      // Check for the subtle brightness boost in full shader code
+      const hasBoost = material.fragmentShader.includes('vColor * 1.3')
+      expect(hasBoost).toBe(true)
     })
 
     it('should use custom ShaderMaterial (not standard PointsMaterial)', () => {
@@ -120,9 +122,9 @@ describe('Star - Phase 2 Stellar Wind Enhancements', () => {
 
       const snapshot = star.getDebugSnapshot()
 
-      // Should still be in valid range (0.8*0.8 to 1.5*1.2)
-      expect(snapshot.sizes.min).toBeGreaterThanOrEqual(0.8 * 0.8 - 0.1) // Small tolerance
-      expect(snapshot.sizes.max).toBeLessThanOrEqual(1.5 * 1.2 + 0.1)
+      // Should still be in valid range (0.5*0.8 to 1.0*1.2)
+      expect(snapshot.sizes.min).toBeGreaterThanOrEqual(0.5 * 0.8 - 0.1) // Small tolerance
+      expect(snapshot.sizes.max).toBeLessThanOrEqual(1.0 * 1.2 + 0.1)
     })
 
     it('should flicker continuously (not just once)', () => {
