@@ -51,12 +51,19 @@
         </div>
 
         <div class="control-group" style="margin-top: 10px;">
+          <label for="volume-control" style="font-size: 12px; color: #aaa;">Volume</label>
+          <input type="range" id="volume-control" min="0" max="100" step="1" value="70" style="width: 100%;">
+          <span id="volume-display" style="font-size: 11px; color: #888;">70%</span>
+        </div>
+
+        <div class="control-group" style="margin-top: 10px;">
+          <button id="btn-mute" class="control-btn">🔊 Sound On</button>
           <button id="btn-fullscreen" class="control-btn">⛶ Fullscreen</button>
         </div>
 
         <div style="margin-top: 10px; font-size: 10px; color: #666; border-top: 1px solid rgba(255,255,255,0.1); padding-top: 8px;">
           <strong>Controls:</strong> Mouse drag to rotate • Scroll to zoom<br>
-          <strong>Keys:</strong> Space = pause • R = reset • F = fullscreen
+          <strong>Keys:</strong> Space = pause • R = reset • F = fullscreen • M = mute
         </div>
       </div>
 
@@ -125,6 +132,7 @@
             B = Bloom<br>
             G = Film grain<br>
             V = Vignette<br>
+            M = Mute audio<br>
             A = Toggle all
           </div>
         </div>

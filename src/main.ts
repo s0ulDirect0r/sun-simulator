@@ -15,6 +15,7 @@ import { FilmGrainPass } from './FilmGrainPass'
 import { VignettePass } from './VignettePass'
 import { GravitationalLensingPass } from './GravitationalLensingPass'
 import { Starfield } from './Starfield'
+import { AudioManager } from './AudioManager'
 
 enum SimulationPhase {
   NEBULA_COLLAPSE = 'NEBULA_COLLAPSE',
@@ -45,6 +46,7 @@ class SunSimulator {
   private supernovaRemnant: SupernovaRemnant | null = null
   private accretionSources: AccretionSource[] = []
   private starfield: Starfield | null = null
+  private audioManager: AudioManager
   private clock: THREE.Clock
   private currentPhase: SimulationPhase = SimulationPhase.NEBULA_COLLAPSE
   private transitionProgress: number = 0
@@ -190,6 +192,9 @@ class SunSimulator {
 
     // Initialize clock for delta time
     this.clock = new THREE.Clock()
+
+    // Initialize audio manager
+    this.audioManager = new AudioManager()
 
     // Create starfield background
     this.starfield = new Starfield(this.scene)
@@ -385,9 +390,12 @@ class SunSimulator {
     const startBtn = document.getElementById('btn-start')
     const startScreen = document.getElementById('start-screen')
     if (startBtn && startScreen) {
-      startBtn.addEventListener('click', () => {
+      startBtn.addEventListener('click', async () => {
         // Hide start screen with fade-out animation
         startScreen.classList.add('hidden')
+
+        // Initialize audio context (requires user interaction)
+        await this.audioManager.initialize()
 
         // Start the simulation after fade-out animation completes
         setTimeout(() => {
@@ -398,6 +406,8 @@ class SunSimulator {
           if (playPauseBtn) {
             playPauseBtn.textContent = '⏸️ Pause'
           }
+          // Start nebula phase audio
+          this.audioManager.playPhase(SimulationPhase.NEBULA_COLLAPSE)
           // Remove from DOM after animation
           startScreen.remove()
         }, 500) // Match fade-out animation duration
@@ -434,6 +444,27 @@ class SunSimulator {
       speedControl.addEventListener('input', () => {
         this.timeScale = parseFloat(speedControl.value)
         speedDisplay.textContent = `${this.timeScale.toFixed(1)}x`
+      })
+    }
+
+    // Volume control
+    const volumeControl = document.getElementById('volume-control') as HTMLInputElement
+    const volumeDisplay = document.getElementById('volume-display')
+    if (volumeControl && volumeDisplay) {
+      volumeControl.addEventListener('input', () => {
+        const volume = parseInt(volumeControl.value) / 100
+        this.audioManager.setVolume(volume)
+        volumeDisplay.textContent = `${volumeControl.value}%`
+      })
+    }
+
+    // Mute button
+    const muteBtn = document.getElementById('btn-mute')
+    if (muteBtn) {
+      muteBtn.addEventListener('click', () => {
+        this.audioManager.toggleMute()
+        const isMuted = this.audioManager.isMutedState()
+        muteBtn.textContent = isMuted ? '🔇 Sound Off' : '🔊 Sound On'
       })
     }
 
@@ -561,6 +592,15 @@ class SunSimulator {
           this.debugState.vignette = newState
           this.applyDebugState()
           console.log(`[DEBUG] Toggle All: ${newState ? 'ON' : 'OFF'}`)
+          break
+        case 'm':
+          // Toggle audio mute
+          this.audioManager.toggleMute()
+          const muteBtn = document.getElementById('btn-mute')
+          if (muteBtn) {
+            const isMuted = this.audioManager.isMutedState()
+            muteBtn.textContent = isMuted ? '🔇 Sound Off' : '🔊 Sound On'
+          }
           break
       }
     })
@@ -930,6 +970,9 @@ class SunSimulator {
       this.star.startRedGiantExpansion()
     }
 
+    // Transition audio to red giant phase
+    this.audioManager.transitionToPhase(SimulationPhase.RED_GIANT, 4.0)
+
     // Update phase
     this.currentPhase = SimulationPhase.RED_GIANT
     this.lastDebugText = ''
@@ -952,6 +995,9 @@ class SunSimulator {
       const currentStarRadius = this.star['currentRadius'] || 25.0
       this.supernovaRemnant = new SupernovaRemnant(this.scene, currentStarRadius)
     }
+
+    // Transition audio to supernova (dramatic!)
+    this.audioManager.transitionToPhase(SimulationPhase.SUPERNOVA, 1.5)
 
     // Create black hole immediately (physically accurate: forms during core collapse)
     this.blackHole = new BlackHole(this.scene)
@@ -992,6 +1038,9 @@ class SunSimulator {
 
     // Black hole already exists and is fully formed (created at t=0, grown during t=0-2s)
     // Now set up accretion and transition to BLACK_HOLE phase
+
+    // Transition audio to black hole phase (eerie!)
+    this.audioManager.transitionToPhase(SimulationPhase.BLACK_HOLE, 3.0)
 
     // Apply debug glow intensity if set
     if (this.blackHole) {
@@ -1097,6 +1146,12 @@ class SunSimulator {
     // Create star at protostar's current size
     this.star = new Star(this.scene, protostarRadius)
     this.ignitionBurst = new IgnitionBurst(this.scene)
+
+    // Transition audio to main sequence phase (fusion power!)
+    this.audioManager.transitionToPhase(SimulationPhase.MAIN_SEQUENCE, 3.0)
+
+    // Play ignition burst sound effect
+    this.audioManager.playSoundEffect('ignition-burst', 0.8)
 
     // Create planet system
     this.planetSystem = new PlanetSystem(this.scene)
