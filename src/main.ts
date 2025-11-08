@@ -59,7 +59,7 @@ class SunSimulator {
   private redGiantDuration: number = 45.0 // 45 seconds total: 24s expansion + 21s stable red giant before supernova
   private supernovaTimer: number = 0
   private supernovaDuration: number = 8.0 // 8 seconds for supernova before black hole
-  private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 50)
+  private cameraBasePosition: THREE.Vector3 = new THREE.Vector3(0, 0, 60) // Phase 1: Zoomed out 20% from 50
   private isPaused: boolean = true // Start paused until user clicks "Begin Simulation"
   private timeScale: number = 1.0
   private simulationStarted: boolean = false // Track if simulation has started
@@ -132,7 +132,7 @@ class SunSimulator {
       0.1,
       1000
     )
-    this.camera.position.set(0, 0, 50)
+    this.camera.position.set(0, 0, 60) // Phase 1: Zoomed out 20% from 50
 
     // Initialize renderer
     this.renderer = new THREE.WebGLRenderer({
@@ -804,6 +804,14 @@ class SunSimulator {
         if (this.star) {
           this.star.update(deltaTime)
 
+          // Zoom camera out as red giant expands (half the expansion rate)
+          const expansionProgress = this.star.getExpansionProgress()
+          // Zoom from 40 (phase 2 position) to ~90 as star expands
+          // Star expands by ~6x, so camera zooms out proportionally (half the expansion)
+          const targetZ = 40 + (50 * expansionProgress)
+          this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, targetZ, 0.02)
+          this.cameraBasePosition.z = this.camera.position.z
+
           // Track red giant duration and trigger supernova
           this.redGiantTimer += deltaTime
           if (this.redGiantTimer >= this.redGiantDuration && !this.star.isInSupernovaPhase()) {
@@ -885,6 +893,16 @@ class SunSimulator {
           this.lensingPass.setBlackHolePosition(this.blackHole.getPosition())
           this.lensingPass.setSchwarzschildRadius(this.blackHole.getEventHorizonRadius())
         }
+
+        // Smoothly move camera to elevated position to see the disk better
+        // Target: (0, 8, 95) from current position (0, 0, 80)
+        const targetY = 8
+        const targetZ = 95
+        this.camera.position.y = THREE.MathUtils.lerp(this.camera.position.y, targetY, 0.01)
+        this.camera.position.z = THREE.MathUtils.lerp(this.camera.position.z, targetZ, 0.01)
+        this.cameraBasePosition.copy(this.camera.position)
+        this.controls.update()
+
         // Continue updating supernova remnant for accretion effect
         if (this.supernovaRemnant) {
           this.supernovaRemnant.update(deltaTime)
@@ -1048,6 +1066,7 @@ class SunSimulator {
     // Update phase
     this.currentPhase = SimulationPhase.BLACK_HOLE
     this.isCameraLocked = true // Keep camera locked for black hole phase
+    // Phase 5: Camera will smoothly move in the update loop (not instant)
     this.lastDebugText = ''
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
@@ -1124,6 +1143,11 @@ class SunSimulator {
     // Update phase
     this.currentPhase = SimulationPhase.MAIN_SEQUENCE
     this.isCameraLocked = false // FREE CAMERA - user can explore the star
+    // Phase 2: Zoom in closer to the main sequence star
+    this.camera.position.set(0, 0, 40)
+    this.cameraBasePosition.set(0, 0, 40)
+    this.controls.target.set(0, 0, 0)
+    this.controls.update()
     this.lastDebugText = ''
     if (this.debugRadiusElement) {
       this.debugRadiusElement.textContent = ''
