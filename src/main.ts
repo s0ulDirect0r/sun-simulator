@@ -609,6 +609,17 @@ class SunSimulator {
       })
     }
 
+    const lensingStrengthSlider = document.getElementById('debug-lensing-strength') as HTMLInputElement
+    const lensingStrengthVal = document.getElementById('debug-lensing-strength-val')
+    if (lensingStrengthSlider && lensingStrengthVal) {
+      lensingStrengthSlider.addEventListener('input', () => {
+        const strength = parseFloat(lensingStrengthSlider.value)
+        lensingStrengthVal.textContent = strength.toFixed(2)
+        // Apply to lensing pass
+        this.lensingPass.setLensingStrength(strength)
+      })
+    }
+
     // Reset bloom controls button
     const bloomResetBtn = document.getElementById('debug-bloom-reset')
     if (bloomResetBtn) {
@@ -637,11 +648,18 @@ class SunSimulator {
           ehGlowSlider.value = '2.0'
           ehGlowVal.textContent = '2.00'
         }
+        if (lensingStrengthSlider && lensingStrengthVal) {
+          lensingStrengthSlider.value = '0.8'
+          lensingStrengthVal.textContent = '0.80'
+        }
 
         // Apply to bloom pass
         this.bloomPass.strength = 0.8
         this.bloomPass.threshold = 0.85
         this.bloomPass.radius = 0.4
+
+        // Apply to lensing pass
+        this.lensingPass.setLensingStrength(0.8)
 
         // Apply to black hole if it exists
         if (this.blackHole) {

@@ -32,7 +32,7 @@ export class GravitationalLensingPass extends Pass {
         blackHolePosition: { value: new Vector3(0, 0, 0) },
         blackHoleScreenPos: { value: new Vector2(0.5, 0.5) },
         schwarzschildRadius: { value: 12.0 },
-        lensingStrength: { value: 3.0 }, // EXTREME for testing - should be very obvious
+        lensingStrength: { value: 0.8 }, // Realistic dramatic warping
         enabled: { value: 1.0 }
       },
       vertexShader: `
@@ -71,7 +71,7 @@ export class GravitationalLensingPass extends Pass {
 
             // Schwarzschild deflection angle: α = 2Rs/b
             // Scale radius to screen space (approximate - adjust for aspect ratio)
-            float radiusScreenSpace = schwarzschildRadius / resolution.x * 5.0;
+            float radiusScreenSpace = schwarzschildRadius / resolution.x * 2.0;
 
             // Calculate deflection strength (inverse square-ish for dramatic warping)
             float deflection = (radiusScreenSpace / dist) * lensingStrength;
@@ -90,18 +90,6 @@ export class GravitationalLensingPass extends Pass {
 
             // Sample the scene with distorted UVs
             color = texture2D(tDiffuse, distortedUV);
-
-            // DEBUG: Visualize UV displacement magnitude
-            vec2 uvDisplacement = distortedUV - uv;
-            float displacementMagnitude = length(uvDisplacement);
-
-            // Green = large displacement (should see warping)
-            // Red = small displacement (deflection calculated but too weak)
-            if (displacementMagnitude > 0.05) {
-              color.g += 1.0; // Strong displacement = GREEN
-            } else if (displacementMagnitude > 0.001) {
-              color.r += 0.5; // Weak displacement = RED
-            }
           } else {
             // Pass through unchanged if disabled
             color = texture2D(tDiffuse, uv);
@@ -157,6 +145,13 @@ export class GravitationalLensingPass extends Pass {
    */
   public setLensingStrength(strength: number): void {
     this.material.uniforms.lensingStrength.value = strength
+  }
+
+  /**
+   * Get the current lensing strength
+   */
+  public getLensingStrength(): number {
+    return this.material.uniforms.lensingStrength.value
   }
 
   /**
