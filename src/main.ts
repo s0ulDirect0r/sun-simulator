@@ -1128,4 +1128,22 @@ class SunSimulator {
 }
 
 // Initialize the simulator when DOM is ready
-new SunSimulator()
+const simulator = new SunSimulator()
+
+// Expose to window for E2E testing (Playwright)
+declare global {
+  interface Window {
+    __simulator?: SunSimulator
+    __getStarSnapshot?: () => any
+  }
+}
+
+if (typeof window !== 'undefined') {
+  window.__simulator = simulator
+  window.__getStarSnapshot = () => {
+    if (simulator['star']) {
+      return simulator['star'].getDebugSnapshot()
+    }
+    return null
+  }
+}
