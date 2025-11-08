@@ -13,6 +13,7 @@ import { SupernovaRemnant } from './SupernovaRemnant'
 import { AccretionSource } from './AccretionSource'
 import { FilmGrainPass } from './FilmGrainPass'
 import { VignettePass } from './VignettePass'
+// import { GravitationalLensingPass } from './GravitationalLensingPass' // DISABLED
 import { Starfield } from './Starfield'
 
 enum SimulationPhase {
@@ -29,6 +30,7 @@ class SunSimulator {
   private renderer: THREE.WebGLRenderer
   private composer: EffectComposer
   private bloomPass: UnrealBloomPass
+  // private lensingPass!: GravitationalLensingPass // DISABLED
   private filmGrainPass!: FilmGrainPass
   private vignettePass!: VignettePass
   private ambientLight!: THREE.AmbientLight
@@ -148,6 +150,17 @@ class SunSimulator {
     const renderPass = new RenderPass(this.scene, this.camera)
     this.composer.addPass(renderPass)
 
+    // Add gravitational lensing pass (warps spacetime around black hole)
+    // MUST come before bloom so the warped photon ring gets bloomed beautifully
+    // DISABLED FOR NOW
+    // this.lensingPass = new GravitationalLensingPass(
+    //   new THREE.Vector2(window.innerWidth, window.innerHeight),
+    //   this.camera
+    // )
+    // this.lensingPass.setEnabled(false) // Start disabled, enable during black hole phase
+    // this.composer.addPass(this.lensingPass)
+    // console.log('🌀 [Phase 4] Gravitational lensing pass added to render pipeline')
+
     // Add bloom pass (makes bright things GLOW)
     this.bloomPass = new UnrealBloomPass(
       new THREE.Vector2(window.innerWidth, window.innerHeight),
@@ -221,6 +234,9 @@ class SunSimulator {
 
     // Update composer size
     this.composer.setSize(window.innerWidth, window.innerHeight)
+
+    // Update lensing pass resolution
+    // this.lensingPass.setSize(window.innerWidth, window.innerHeight) // DISABLED
   }
 
   private updatePhaseInfo(phase: string, description?: string): void {
@@ -782,6 +798,10 @@ class SunSimulator {
           if (this.blackHole) {
             this.blackHole.update(deltaTime)
 
+            // Update lensing pass with black hole position and radius
+            // this.lensingPass.setBlackHolePosition(this.blackHole.getPosition()) // DISABLED
+            // this.lensingPass.setSchwarzschildRadius(this.blackHole.getEventHorizonRadius()) // DISABLED
+
             const t = this.supernovaTimer
 
             // Calculate each element's opacity based on its formation timeline
@@ -832,6 +852,10 @@ class SunSimulator {
           this.blackHole.update(deltaTime)
           // Black hole should already be at full opacity from supernova overlap fade-in
           this.blackHole.setOpacity(1.0)
+
+          // Update lensing pass with black hole position and radius
+          // this.lensingPass.setBlackHolePosition(this.blackHole.getPosition()) // DISABLED
+          // this.lensingPass.setSchwarzschildRadius(this.blackHole.getEventHorizonRadius()) // DISABLED
         }
         // Continue updating supernova remnant for accretion effect
         if (this.supernovaRemnant) {
@@ -917,6 +941,14 @@ class SunSimulator {
     if (this.blackHole) {
       (this.blackHole.eventHorizon.material as THREE.ShaderMaterial).uniforms.glowIntensity.value = this.debugState.eventHorizonGlow
     }
+
+    // Enable gravitational lensing pass - warp spacetime!
+    // this.lensingPass.setEnabled(false) // DISABLED
+    // console.log('🌀 [Phase 4] Gravitational lensing DISABLED')
+
+    // Hide point light - no light escapes the singularity!
+    this.pointLight.visible = false
+    console.log('💡 Point light hidden - singularity is dark')
 
     // Remove star (core has collapsed)
     if (this.star) {
