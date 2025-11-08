@@ -48,7 +48,7 @@ export class Star {
   public streakParticles!: THREE.Points
   private streakGeometry!: THREE.BufferGeometry
   private streakMaterial!: THREE.ShaderMaterial
-  private streakCount: number = 300 // Fast energy bursts (reduced for subtlety)
+  private streakCount: number = 100 // Fast energy bursts (reduced for subtlety)
   private streakPositions!: Float32Array
   private streakVelocities!: Float32Array
   private streakSizes!: Float32Array
@@ -665,205 +665,205 @@ export class Star {
     if (!this.isSupernova) {
       // Smooth contraction from protostar size to main sequence size
       if (this.contractionTime < this.contractionDuration) {
-      this.contractionTime += deltaTime
-      const contractionProgress = Math.min(this.contractionTime / this.contractionDuration, 1.0)
-      // Use easeOutCubic for smooth deceleration
-      const eased = 1 - Math.pow(1 - contractionProgress, 3)
-      // Contract from initial size (whatever protostar was) to final main sequence size
-      this.currentRadius = THREE.MathUtils.lerp(this.initialRadius, this.starRadius, eased)
-    } else if (this.isRedGiant && this.expansionTime < this.expansionDuration) {
-      // Red giant expansion - dramatic size increase
-      this.expansionTime += deltaTime
-      const expansionProgress = Math.min(this.expansionTime / this.expansionDuration, 1.0)
-      // Use easeInOutQuad for smooth acceleration and deceleration
-      const eased = expansionProgress < 0.5
-        ? 2 * expansionProgress * expansionProgress
-        : 1 - Math.pow(-2 * expansionProgress + 2, 2) / 2
-      this.currentRadius = THREE.MathUtils.lerp(this.expansionStartRadius, this.redGiantRadius, eased)
-    } else if (!this.isRedGiant) {
-      this.currentRadius = this.starRadius
-    }
-
-    // Pulse effect - larger and slower for red giants with irregular variation
-    const pulseFrequency = this.isRedGiant ? 0.3 : 0.5
-    const pulseAmplitude = this.isRedGiant ? 0.04 : 0.02
-
-    let pulse: number
-    if (this.isRedGiant) {
-      // Irregular pulsing for red giant - add chaos
-      this.irregularPulseOffset += (Math.random() - 0.5) * 0.02
-      this.irregularPulseOffset *= 0.98 // Decay for stability
-      const irregularPulse = Math.sin(this.time * pulseFrequency + this.irregularPulseOffset) * pulseAmplitude
-      const secondaryPulse = Math.sin(this.time * 0.15) * 0.02 // Slower secondary breathing
-      pulse = 1 + irregularPulse + secondaryPulse
-    } else {
-      pulse = Math.sin(this.time * pulseFrequency) * pulseAmplitude + 1
-    }
-
-    this.currentPulse = pulse // Store for stellar wind modulation
-
-    const targetScale = (this.currentRadius / this.starRadius) * pulse
-    this.star.scale.setScalar(targetScale)
-
-    // Update star color - shift from yellow-white to red-orange
-    const material = this.star.material as THREE.MeshStandardMaterial
-    if (this.isRedGiant) {
-      // Yellow-white (main sequence) to red-orange (red giant)
-      const mainSequenceColor = new THREE.Color(0xffff88)
-      const redGiantColor = new THREE.Color(0xff5533)
-      material.color.lerpColors(mainSequenceColor, redGiantColor, expansionProgress)
-
-      // Adjust emissive color too
-      const mainSequenceEmissive = new THREE.Color(0xffff44)
-      const redGiantEmissive = new THREE.Color(0xff4422)
-      material.emissive.lerpColors(mainSequenceEmissive, redGiantEmissive, expansionProgress)
-
-      // Red giants are cooler but larger, so less emissive intensity
-      // Use linear progression to match color transition
-      material.emissiveIntensity = THREE.MathUtils.lerp(3, 2, expansionProgress)
-
-      // Surface opacity variation - make red giant more diffuse/transparent
-      // Also delay the transparency to maintain solid appearance longer
-      material.transparent = true
-      const opacityProgress = Math.max(0, (expansionProgress - 0.3) / 0.7) // Start at 30% expansion
-      material.opacity = THREE.MathUtils.lerp(1.0, 0.7, opacityProgress) // More transparent to show inner layers
-    }
-
-    // Pulsing light intensity - dimmer for red giants (cooler surface)
-    const baseLightIntensity = this.isRedGiant ? 10 : 15
-    const lightPulse = Math.sin(this.time * 0.7) * 2 + baseLightIntensity
-    this.starLight.intensity = lightPulse
-
-    // Update light color to match star
-    if (this.isRedGiant) {
-      const lightColor = material.color.clone()
-      this.starLight.color.copy(lightColor)
-    }
-
-    // Rotate corona slowly
-    this.corona.rotation.y += 0.0005
-    this.corona.rotation.x += 0.0002
-
-    // Fade in corona during early main sequence (unless red giant or supernova)
-    if (!this.isRedGiant && !this.isSupernova) {
-      if (this.coronaFadeInTime < this.coronaFadeInDuration) {
-        this.coronaFadeInTime += deltaTime
-        const fadeProgress = Math.min(this.coronaFadeInTime / this.coronaFadeInDuration, 1.0)
-        // Fade from 0 to 0.5 (subtle glow)
-        this.coronaMaterial.opacity = fadeProgress * 0.5
+        this.contractionTime += deltaTime
+        const contractionProgress = Math.min(this.contractionTime / this.contractionDuration, 1.0)
+        // Use easeOutCubic for smooth deceleration
+        const eased = 1 - Math.pow(1 - contractionProgress, 3)
+        // Contract from initial size (whatever protostar was) to final main sequence size
+        this.currentRadius = THREE.MathUtils.lerp(this.initialRadius, this.starRadius, eased)
+      } else if (this.isRedGiant && this.expansionTime < this.expansionDuration) {
+        // Red giant expansion - dramatic size increase
+        this.expansionTime += deltaTime
+        const expansionProgress = Math.min(this.expansionTime / this.expansionDuration, 1.0)
+        // Use easeInOutQuad for smooth acceleration and deceleration
+        const eased = expansionProgress < 0.5
+          ? 2 * expansionProgress * expansionProgress
+          : 1 - Math.pow(-2 * expansionProgress + 2, 2) / 2
+        this.currentRadius = THREE.MathUtils.lerp(this.expansionStartRadius, this.redGiantRadius, eased)
+      } else if (!this.isRedGiant) {
+        this.currentRadius = this.starRadius
       }
-    }
 
-    // Fade out corona during red giant phase (red giants have diffuse atmospheres, not distinct coronas)
-    if (this.isRedGiant && !this.isSupernova) {
-      if (this.coronaFadeOutTime < this.coronaFadeOutDuration) {
-        this.coronaFadeOutTime += deltaTime
-        const fadeProgress = Math.min(this.coronaFadeOutTime / this.coronaFadeOutDuration, 1.0)
-        // Fade from 0.5 (main sequence) to 0.0 (invisible)
-        this.coronaMaterial.opacity = (1.0 - fadeProgress) * 0.5
+      // Pulse effect - larger and slower for red giants with irregular variation
+      const pulseFrequency = this.isRedGiant ? 0.3 : 0.5
+      const pulseAmplitude = this.isRedGiant ? 0.04 : 0.02
+
+      let pulse: number
+      if (this.isRedGiant) {
+        // Irregular pulsing for red giant - add chaos
+        this.irregularPulseOffset += (Math.random() - 0.5) * 0.02
+        this.irregularPulseOffset *= 0.98 // Decay for stability
+        const irregularPulse = Math.sin(this.time * pulseFrequency + this.irregularPulseOffset) * pulseAmplitude
+        const secondaryPulse = Math.sin(this.time * 0.15) * 0.02 // Slower secondary breathing
+        pulse = 1 + irregularPulse + secondaryPulse
       } else {
-        this.coronaMaterial.opacity = 0.0
+        pulse = Math.sin(this.time * pulseFrequency) * pulseAmplitude + 1
       }
 
-      // Update volumetric layers for depth effect - only if they're visible
-      const innerMaterial = this.redGiantInnerLayer.material as THREE.MeshBasicMaterial
-      const midMaterial = this.redGiantMidLayer.material as THREE.MeshBasicMaterial
-      const outerMaterial = this.redGiantOuterLayer.material as THREE.MeshBasicMaterial
+      this.currentPulse = pulse // Store for stellar wind modulation
 
-      if (this.redGiantInnerLayer.visible) {
-        // Scale layers to actual world size, spread them out for visible depth
-        // Inner layer - hot core at 70% of current radius
-        const innerScale = this.currentRadius * 0.7 * pulse
-        this.redGiantInnerLayer.scale.setScalar(innerScale)
-        innerMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.4, expansionProgress)
+      const targetScale = (this.currentRadius / this.starRadius) * pulse
+      this.star.scale.setScalar(targetScale)
 
-        // Mid layer - at 95% of current radius (just below surface)
-        const midScale = this.currentRadius * 0.95 * pulse
-        this.redGiantMidLayer.scale.setScalar(midScale)
-        midMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.3, expansionProgress)
+      // Update star color - shift from yellow-white to red-orange
+      const material = this.star.material as THREE.MeshStandardMaterial
+      if (this.isRedGiant) {
+        // Yellow-white (main sequence) to red-orange (red giant)
+        const mainSequenceColor = new THREE.Color(0xffff88)
+        const redGiantColor = new THREE.Color(0xff5533)
+        material.color.lerpColors(mainSequenceColor, redGiantColor, expansionProgress)
 
-        // Outer layer - at 120% of current radius (extended diffuse atmosphere)
-        const outerScale = this.currentRadius * 1.2 * pulse
-        this.redGiantOuterLayer.scale.setScalar(outerScale)
-        outerMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.25, expansionProgress)
-      } else {
-        // When toggled off, ensure layers are invisible
-        innerMaterial.opacity = 0
-        midMaterial.opacity = 0
-        outerMaterial.opacity = 0
+        // Adjust emissive color too
+        const mainSequenceEmissive = new THREE.Color(0xffff44)
+        const redGiantEmissive = new THREE.Color(0xff4422)
+        material.emissive.lerpColors(mainSequenceEmissive, redGiantEmissive, expansionProgress)
+
+        // Red giants are cooler but larger, so less emissive intensity
+        // Use linear progression to match color transition
+        material.emissiveIntensity = THREE.MathUtils.lerp(3, 2, expansionProgress)
+
+        // Surface opacity variation - make red giant more diffuse/transparent
+        // Also delay the transparency to maintain solid appearance longer
+        material.transparent = true
+        const opacityProgress = Math.max(0, (expansionProgress - 0.3) / 0.7) // Start at 30% expansion
+        material.opacity = THREE.MathUtils.lerp(1.0, 0.7, opacityProgress) // More transparent to show inner layers
       }
 
-      // Animate surface texture particles - make them breathe and move with convection
-      this.surfaceTextureMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.4, expansionProgress)
+      // Pulsing light intensity - dimmer for red giants (cooler surface)
+      const baseLightIntensity = this.isRedGiant ? 10 : 15
+      const lightPulse = Math.sin(this.time * 0.7) * 2 + baseLightIntensity
+      this.starLight.intensity = lightPulse
 
-      // Update each surface texture particle position for NOISE-DRIVEN CELL convection
-      const texturePositions = this.surfaceTextureGeometry.attributes.position.array as Float32Array
-      const scaleFactor = (this.currentRadius / this.starRadius) * pulse // Breathe with the star
+      // Update light color to match star
+      if (this.isRedGiant) {
+        const lightColor = material.color.clone()
+        this.starLight.color.copy(lightColor)
+      }
 
-      // Time evolution for churning cells - faster for visible movement
-      const slowTime = this.time * 0.25 // Increased from 0.08 for visible churning
+      // Rotate corona slowly
+      this.corona.rotation.y += 0.0005
+      this.corona.rotation.x += 0.0002
 
-      for (let i = 0; i < this.surfaceTextureCount; i++) {
-        const i3 = i * 3
+      // Fade in corona during early main sequence (unless red giant or supernova)
+      if (!this.isRedGiant && !this.isSupernova) {
+        if (this.coronaFadeInTime < this.coronaFadeInDuration) {
+          this.coronaFadeInTime += deltaTime
+          const fadeProgress = Math.min(this.coronaFadeInTime / this.coronaFadeInDuration, 1.0)
+          // Fade from 0 to 0.5 (subtle glow)
+          this.coronaMaterial.opacity = fadeProgress * 0.5
+        }
+      }
 
-        // Get base position
-        const baseX = this.surfaceTextureBasePositions[i3]
-        const baseY = this.surfaceTextureBasePositions[i3 + 1]
-        const baseZ = this.surfaceTextureBasePositions[i3 + 2]
-
-        // Convert to spherical coordinates for noise sampling
-        const baseRadius = Math.sqrt(baseX * baseX + baseY * baseY + baseZ * baseZ)
-        const theta = Math.atan2(baseY, baseX)
-        const phi = Math.acos(baseZ / baseRadius)
-
-        // Sample 3D noise for this cell (coherent across cell members)
-        // Add small per-particle offset to time so cells evolve at different rates
-        const particleTimeOffset = this.surfaceTextureCells[i] * 0.1
-        const noiseX = theta * this.cellNoiseFrequency
-        const noiseY = phi * this.cellNoiseFrequency
-        const noiseZ = slowTime + particleTimeOffset
-        const cellNoise = Noise3D.noise(noiseX, noiseY, noiseZ)
-
-        // Convert noise to radial pulsation (cells breathe in/out together)
-        // Scale displacement relative to current star size for visibility
-        // Map [0,1] noise to displacement as percentage of base radius
-        const displacementPercent = (cellNoise - 0.5) * 0.3 // ±15% of radius
-        const radialDisplacement = baseRadius * displacementPercent
-
-        // Apply radial displacement along normal direction
-        const normal = {
-          x: baseX / baseRadius,
-          y: baseY / baseRadius,
-          z: baseZ / baseRadius
+      // Fade out corona during red giant phase (red giants have diffuse atmospheres, not distinct coronas)
+      if (this.isRedGiant && !this.isSupernova) {
+        if (this.coronaFadeOutTime < this.coronaFadeOutDuration) {
+          this.coronaFadeOutTime += deltaTime
+          const fadeProgress = Math.min(this.coronaFadeOutTime / this.coronaFadeOutDuration, 1.0)
+          // Fade from 0.5 (main sequence) to 0.0 (invisible)
+          this.coronaMaterial.opacity = (1.0 - fadeProgress) * 0.5
+        } else {
+          this.coronaMaterial.opacity = 0.0
         }
 
-        const displacedX = baseX + normal.x * radialDisplacement
-        const displacedY = baseY + normal.y * radialDisplacement
-        const displacedZ = baseZ + normal.z * radialDisplacement
+        // Update volumetric layers for depth effect - only if they're visible
+        const innerMaterial = this.redGiantInnerLayer.material as THREE.MeshBasicMaterial
+        const midMaterial = this.redGiantMidLayer.material as THREE.MeshBasicMaterial
+        const outerMaterial = this.redGiantOuterLayer.material as THREE.MeshBasicMaterial
 
-        // Apply scale factor
-        texturePositions[i3] = displacedX * scaleFactor
-        texturePositions[i3 + 1] = displacedY * scaleFactor
-        texturePositions[i3 + 2] = displacedZ * scaleFactor
+        if (this.redGiantInnerLayer.visible) {
+          // Scale layers to actual world size, spread them out for visible depth
+          // Inner layer - hot core at 70% of current radius
+          const innerScale = this.currentRadius * 0.7 * pulse
+          this.redGiantInnerLayer.scale.setScalar(innerScale)
+          innerMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.4, expansionProgress)
 
-        // Update particle color based on temperature (noise = convection upwelling)
-        // High noise (>0.5) = hot upwelling plasma (bright red-orange)
-        // Low noise (<0.5) = cool downflow (dark red-brown)
-        const hotColor = new THREE.Color(0xff4422) // Bright red-orange (hot for red giant)
-        const coolColor = new THREE.Color(0x441100) // Very dark red-brown (cool)
-        const cellColor = new THREE.Color().lerpColors(coolColor, hotColor, cellNoise)
+          // Mid layer - at 95% of current radius (just below surface)
+          const midScale = this.currentRadius * 0.95 * pulse
+          this.redGiantMidLayer.scale.setScalar(midScale)
+          midMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.3, expansionProgress)
 
-        this.surfaceTextureColors[i3] = cellColor.r
-        this.surfaceTextureColors[i3 + 1] = cellColor.g
-        this.surfaceTextureColors[i3 + 2] = cellColor.b
+          // Outer layer - at 120% of current radius (extended diffuse atmosphere)
+          const outerScale = this.currentRadius * 1.2 * pulse
+          this.redGiantOuterLayer.scale.setScalar(outerScale)
+          outerMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.25, expansionProgress)
+        } else {
+          // When toggled off, ensure layers are invisible
+          innerMaterial.opacity = 0
+          midMaterial.opacity = 0
+          outerMaterial.opacity = 0
+        }
+
+        // Animate surface texture particles - make them breathe and move with convection
+        this.surfaceTextureMaterial.opacity = THREE.MathUtils.lerp(0.0, 0.4, expansionProgress)
+
+        // Update each surface texture particle position for NOISE-DRIVEN CELL convection
+        const texturePositions = this.surfaceTextureGeometry.attributes.position.array as Float32Array
+        const scaleFactor = (this.currentRadius / this.starRadius) * pulse // Breathe with the star
+
+        // Time evolution for churning cells - faster for visible movement
+        const slowTime = this.time * 0.25 // Increased from 0.08 for visible churning
+
+        for (let i = 0; i < this.surfaceTextureCount; i++) {
+          const i3 = i * 3
+
+          // Get base position
+          const baseX = this.surfaceTextureBasePositions[i3]
+          const baseY = this.surfaceTextureBasePositions[i3 + 1]
+          const baseZ = this.surfaceTextureBasePositions[i3 + 2]
+
+          // Convert to spherical coordinates for noise sampling
+          const baseRadius = Math.sqrt(baseX * baseX + baseY * baseY + baseZ * baseZ)
+          const theta = Math.atan2(baseY, baseX)
+          const phi = Math.acos(baseZ / baseRadius)
+
+          // Sample 3D noise for this cell (coherent across cell members)
+          // Add small per-particle offset to time so cells evolve at different rates
+          const particleTimeOffset = this.surfaceTextureCells[i] * 0.1
+          const noiseX = theta * this.cellNoiseFrequency
+          const noiseY = phi * this.cellNoiseFrequency
+          const noiseZ = slowTime + particleTimeOffset
+          const cellNoise = Noise3D.noise(noiseX, noiseY, noiseZ)
+
+          // Convert noise to radial pulsation (cells breathe in/out together)
+          // Scale displacement relative to current star size for visibility
+          // Map [0,1] noise to displacement as percentage of base radius
+          const displacementPercent = (cellNoise - 0.5) * 0.3 // ±15% of radius
+          const radialDisplacement = baseRadius * displacementPercent
+
+          // Apply radial displacement along normal direction
+          const normal = {
+            x: baseX / baseRadius,
+            y: baseY / baseRadius,
+            z: baseZ / baseRadius
+          }
+
+          const displacedX = baseX + normal.x * radialDisplacement
+          const displacedY = baseY + normal.y * radialDisplacement
+          const displacedZ = baseZ + normal.z * radialDisplacement
+
+          // Apply scale factor
+          texturePositions[i3] = displacedX * scaleFactor
+          texturePositions[i3 + 1] = displacedY * scaleFactor
+          texturePositions[i3 + 2] = displacedZ * scaleFactor
+
+          // Update particle color based on temperature (noise = convection upwelling)
+          // High noise (>0.5) = hot upwelling plasma (bright red-orange)
+          // Low noise (<0.5) = cool downflow (dark red-brown)
+          const hotColor = new THREE.Color(0xff4422) // Bright red-orange (hot for red giant)
+          const coolColor = new THREE.Color(0x441100) // Very dark red-brown (cool)
+          const cellColor = new THREE.Color().lerpColors(coolColor, hotColor, cellNoise)
+
+          this.surfaceTextureColors[i3] = cellColor.r
+          this.surfaceTextureColors[i3 + 1] = cellColor.g
+          this.surfaceTextureColors[i3 + 2] = cellColor.b
+        }
+
+        this.surfaceTextureGeometry.attributes.position.needsUpdate = true
+        this.surfaceTextureGeometry.attributes.color.needsUpdate = true
+      } else {
+        // Hide surface texture for main sequence
+        this.surfaceTextureMaterial.opacity = 0.0
       }
-
-      this.surfaceTextureGeometry.attributes.position.needsUpdate = true
-      this.surfaceTextureGeometry.attributes.color.needsUpdate = true
-    } else {
-      // Hide surface texture for main sequence
-      this.surfaceTextureMaterial.opacity = 0.0
-    }
     } // End skip normal star behavior during supernova
 
     // Update surface activity particles (stellar wind)
@@ -1160,7 +1160,7 @@ export class Star {
 
     // Dispose geometries and materials
     this.star.geometry.dispose()
-    ;(this.star.material as THREE.Material).dispose()
+      ; (this.star.material as THREE.Material).dispose()
     this.shockwave.geometry.dispose()
     this.shockwaveMaterial.dispose()
     this.coronaGeometry.dispose()
@@ -1172,16 +1172,16 @@ export class Star {
     this.surfaceTextureGeometry.dispose()
     this.surfaceTextureMaterial.dispose()
     this.redGiantInnerLayer.geometry.dispose()
-    ;(this.redGiantInnerLayer.material as THREE.Material).dispose()
+      ; (this.redGiantInnerLayer.material as THREE.Material).dispose()
     this.redGiantMidLayer.geometry.dispose()
-    ;(this.redGiantMidLayer.material as THREE.Material).dispose()
+      ; (this.redGiantMidLayer.material as THREE.Material).dispose()
     this.redGiantOuterLayer.geometry.dispose()
-    ;(this.redGiantOuterLayer.material as THREE.Material).dispose()
+      ; (this.redGiantOuterLayer.material as THREE.Material).dispose()
 
     // Dispose hero beams
     for (const beam of this.beamMeshes) {
       beam.geometry.dispose()
-      ;(beam.material as THREE.Material).dispose()
+        ; (beam.material as THREE.Material).dispose()
     }
 
     // Dispose supernova flash if it exists
