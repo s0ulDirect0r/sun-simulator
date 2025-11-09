@@ -1,5 +1,22 @@
 # Repository Guidelines
 
+## Expected Conversation Start Pattern
+
+**CORRECT initialization sequence:**
+```
+[User starts conversation]
+Claude: [Uses Read tool on AGENTS.md]
+Claude: I've read the workflow guidelines. Ready to work!
+Claude: [Runs bd ready --json to check for work]
+```
+
+**INCORRECT (do NOT do this):**
+```
+[User starts conversation]
+Claude: Hello! What would you like to work on?
+[Has not read AGENTS.md first]
+```
+
 ## Issue Tracking with bd (beads)
 
 **IMPORTANT**: This project uses **bd (beads)** for ALL issue tracking. Do NOT use markdown TODOs, task lists, or other tracking methods.
@@ -12,6 +29,8 @@
 - Prevents duplicate tracking systems and confusion
 
 ### Quick Start
+
+Use `bd` CLI commands via the Bash tool. Always include `--json` flag for programmatic use.
 
 **Check for ready work:**
 ```bash
@@ -67,26 +86,6 @@ bd automatically syncs with git:
 - Exports to `.beads/issues.jsonl` after changes (5s debounce)
 - Imports from JSONL when newer (e.g., after `git pull`)
 - No manual export/import needed!
-
-### MCP Server (Recommended)
-
-If using Claude or MCP-compatible clients, install the beads MCP server:
-
-```bash
-pip install beads-mcp
-```
-
-Add to MCP config (e.g., `~/.config/claude/config.json`):
-```json
-{
-  "beads": {
-    "command": "beads-mcp",
-    "args": []
-  }
-}
-```
-
-Then use `mcp__beads__*` functions instead of CLI commands.
 
 ### Managing AI-Generated Planning Documents
 
