@@ -981,6 +981,9 @@ class SunSimulator {
   private startSupernova(): void {
     console.log('Starting supernova explosion...')
 
+    // Play explosion sound effect immediately
+    this.audioManager.playSoundEffect('explosion-flash', 1.0)
+
     if (this.star) {
       this.star.startSupernova()
 
@@ -991,9 +994,6 @@ class SunSimulator {
 
     // Transition audio to supernova (dramatic!)
     this.audioManager.transitionToPhase(SimulationPhase.SUPERNOVA, 1.5)
-
-    // Play explosion sound effect
-    this.audioManager.playSoundEffect('explosion-flash', 1.0)
 
     // Create black hole immediately (physically accurate: forms during core collapse)
     this.blackHole = new BlackHole(this.scene)
@@ -1114,9 +1114,6 @@ class SunSimulator {
 
       this.accretionSources.push(source)
     })
-
-    // Play accretion sound effect when streams begin
-    this.audioManager.playSoundEffect('accretion-chunk', 0.7)
 
     // Remove planets
     if (this.planetSystem) {
