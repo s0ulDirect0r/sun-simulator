@@ -963,8 +963,8 @@ class SunSimulator {
       this.star.startRedGiantExpansion()
     }
 
-    // Transition audio to red giant phase
-    this.audioManager.transitionToPhase(SimulationPhase.RED_GIANT, 4.0)
+    // Transition audio to red giant phase (slow, smooth crossfade)
+    this.audioManager.transitionToPhase(SimulationPhase.RED_GIANT, 7.0)
 
     // Update phase
     this.currentPhase = SimulationPhase.RED_GIANT
