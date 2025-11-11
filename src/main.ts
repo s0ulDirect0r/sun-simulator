@@ -400,6 +400,8 @@ class SunSimulator {
           }
           // Start nebula phase audio
           this.audioManager.playPhase(SimulationPhase.NEBULA_COLLAPSE)
+          // Start background music (continuous underscore)
+          this.audioManager.playBackgroundMusic()
           // Remove from DOM after animation
           startScreen.remove()
         }, 500) // Match fade-out animation duration
