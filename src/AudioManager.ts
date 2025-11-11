@@ -41,7 +41,6 @@ export class AudioManager {
   private phaseAudioConfig: Map<SimulationPhase, AudioConfig> = new Map()
   private currentPhaseSource: AudioBufferSourceNode | null = null
   private currentPhaseGain: GainNode | null = null
-  private currentPhase: SimulationPhase | null = null
 
   // Sound effects
   private sfxBuffers: Map<string, SoundEffect> = new Map()
@@ -249,7 +248,6 @@ export class AudioManager {
     // Store references
     this.currentPhaseSource = source
     this.currentPhaseGain = gainNode
-    this.currentPhase = phase
 
     console.log(`[AUDIO] Playing phase: ${phase}`)
   }
@@ -323,7 +321,6 @@ export class AudioManager {
     // Update references
     this.currentPhaseSource = nextSource
     this.currentPhaseGain = nextGainNode
-    this.currentPhase = nextPhase
 
     // Reset crossfade flag after completion
     setTimeout(() => {
