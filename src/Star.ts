@@ -578,7 +578,6 @@ export class Star {
       this.star.scale.setScalar(targetScale)
 
       if (collapseProgress >= 1.0) {
-        console.log('[COLLAPSE] Core collapsed to singularity')
       }
     }
 
@@ -1070,7 +1069,6 @@ export class Star {
     this.expansionTime = 0
     this.expansionStartRadius = this.currentRadius
 
-    console.log('Red giant expansion initiated!')
   }
 
   public isInRedGiantPhase(): boolean {
@@ -1088,7 +1086,6 @@ export class Star {
     this.isCollapsing = true
     this.collapseTime = 0
     this.collapseStartScale = this.star.scale.x // Capture current scale
-    console.log(`[COLLAPSE] Core collapse initiated! Starting scale: ${this.collapseStartScale.toFixed(2)}`)
   }
 
   public startSupernova(): void {
@@ -1110,7 +1107,6 @@ export class Star {
     this.redGiantInnerLayer.visible = false
     this.redGiantMidLayer.visible = false
     this.redGiantOuterLayer.visible = false
-    console.log('SUPERNOVA!')
 
     // Create dramatic scene-filling flash
     this.supernovaFlash = new SupernovaFlash(this.scene)

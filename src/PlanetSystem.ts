@@ -205,7 +205,6 @@ export class PlanetSystem {
   }
 
   private engulfPlanet(index: number): void {
-    console.log(`Planet ${this.planetData[index].name} engulfed by star!`)
     this.engulfedPlanets.add(index)
 
     const planet = this.planets[index]

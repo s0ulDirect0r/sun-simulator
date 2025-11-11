@@ -153,7 +153,6 @@ class SunSimulator {
     )
     this.lensingPass.setEnabled(false) // Start disabled, enable during black hole phase
     this.composer.addPass(this.lensingPass)
-    console.log('🌀 Gravitational lensing pass added to render pipeline')
 
     // Add bloom pass (makes bright things GLOW)
     this.bloomPass = new UnrealBloomPass(
@@ -187,6 +186,18 @@ class SunSimulator {
 
     // Initialize audio manager
     this.audioManager = new AudioManager()
+    // Preload audio files in background (before user interaction)
+    // Note: We can't decode until user clicks (AudioContext requires user gesture)
+    this.audioManager.preloadAudioFiles().then(() => {
+      // Files are downloaded, update button to show it's ready for interaction
+      const startBtn = document.getElementById('btn-start') as HTMLButtonElement
+      if (startBtn) {
+        startBtn.disabled = false
+        startBtn.textContent = 'Begin Simulation'
+        startBtn.style.opacity = '1'
+        startBtn.style.cursor = 'pointer'
+      }
+    })
 
     // Create starfield background
     this.starfield = new Starfield(this.scene)
@@ -383,26 +394,35 @@ class SunSimulator {
     const startScreen = document.getElementById('start-screen')
     if (startBtn && startScreen) {
       startBtn.addEventListener('click', async () => {
-        // Hide start screen with fade-out animation
-        startScreen.classList.add('hidden')
+        // Disable button and show loading state
+        const button = startBtn as HTMLButtonElement
+        button.disabled = true
+        button.textContent = 'Preparing audio...'
+        button.style.opacity = '0.5'
+        button.style.cursor = 'wait'
 
-        // Initialize audio context (requires user interaction)
+        // Initialize audio context and decode audio (this blocks, but user sees loading)
+        // Audio files are already preloaded as ArrayBuffers
         await this.audioManager.initialize()
 
-        // Start the simulation after fade-out animation completes
+        // Audio is now fully decoded and ready - start simulation immediately!
+        this.simulationStarted = true
+        this.isPaused = false
+        // Reset clock to avoid accumulated delta time
+        this.clock.getDelta()
+        if (playPauseBtn) {
+          playPauseBtn.textContent = '⏸️ Pause'
+        }
+
+        // Start playing audio immediately
+        this.audioManager.playPhase(SimulationPhase.NEBULA_COLLAPSE)
+        this.audioManager.playBackgroundMusic()
+
+        // Hide start screen with fade-out animation (cosmetic, doesn't block sim)
+        startScreen.classList.add('hidden')
+
+        // Remove start screen from DOM after animation completes
         setTimeout(() => {
-          this.simulationStarted = true
-          this.isPaused = false
-          // Reset clock to avoid accumulated delta time
-          this.clock.getDelta()
-          if (playPauseBtn) {
-            playPauseBtn.textContent = '⏸️ Pause'
-          }
-          // Start nebula phase audio
-          this.audioManager.playPhase(SimulationPhase.NEBULA_COLLAPSE)
-          // Start background music (continuous underscore)
-          this.audioManager.playBackgroundMusic()
-          // Remove from DOM after animation
           startScreen.remove()
         }, 500) // Match fade-out animation duration
       })
@@ -498,76 +518,61 @@ class SunSimulator {
         case '1':
           this.debugState.accretionDisk = !this.debugState.accretionDisk
           this.applyDebugState()
-          console.log(`[DEBUG] Accretion Disk: ${this.debugState.accretionDisk ? 'ON' : 'OFF'}`)
           break
         case '2':
           this.debugState.jets = !this.debugState.jets
           this.applyDebugState()
-          console.log(`[DEBUG] Jets: ${this.debugState.jets ? 'ON' : 'OFF'}`)
           break
         case '3':
           this.debugState.eventHorizon = !this.debugState.eventHorizon
           this.applyDebugState()
-          console.log(`[DEBUG] Event Horizon: ${this.debugState.eventHorizon ? 'ON' : 'OFF'}`)
           break
         case '4':
           this.debugState.lensingRing = !this.debugState.lensingRing
           this.applyDebugState()
-          console.log(`[DEBUG] Lensing Ring: ${this.debugState.lensingRing ? 'ON' : 'OFF'}`)
           break
         case '5':
           this.debugState.accretionSources = !this.debugState.accretionSources
           this.applyDebugState()
-          console.log(`[DEBUG] Accretion Sources: ${this.debugState.accretionSources ? 'ON' : 'OFF'}`)
           break
         case '6':
           this.debugState.supernovaRemnant = !this.debugState.supernovaRemnant
           this.applyDebugState()
-          console.log(`[DEBUG] Supernova Remnant: ${this.debugState.supernovaRemnant ? 'ON' : 'OFF'}`)
           break
         case '7':
           this.debugState.redGiantLayers = !this.debugState.redGiantLayers
           this.applyDebugState()
-          console.log(`[DEBUG] Red Giant Layers: ${this.debugState.redGiantLayers ? 'ON' : 'OFF'}`)
-          console.log(`[DEBUG] Star exists: ${!!this.star}, Is red giant: ${this.star?.isInRedGiantPhase()}`)
           break
         case '8':
           this.debugState.stellarWind = !this.debugState.stellarWind
           this.applyDebugState()
-          console.log(`[DEBUG] Stellar Wind: ${this.debugState.stellarWind ? 'ON' : 'OFF'}`)
           break
         case '9':
           this.debugState.surfaceTexture = !this.debugState.surfaceTexture
           this.applyDebugState()
-          console.log(`[DEBUG] Surface Texture: ${this.debugState.surfaceTexture ? 'ON' : 'OFF'}`)
           break
         case 'l':
           this.debugState.ambientLight = !this.debugState.ambientLight
           this.debugState.pointLight = this.debugState.ambientLight // Toggle both together
           this.applyDebugState()
-          console.log(`[DEBUG] Lights: ${this.debugState.ambientLight ? 'ON' : 'OFF'}`)
           break
         case 'b':
           this.debugState.bloom = !this.debugState.bloom
           this.applyDebugState()
-          console.log(`[DEBUG] Bloom: ${this.debugState.bloom ? 'ON' : 'OFF'}`)
           break
         case 'g':
           this.debugState.filmGrain = !this.debugState.filmGrain
           this.applyDebugState()
-          console.log(`[DEBUG] Film Grain: ${this.debugState.filmGrain ? 'ON' : 'OFF'}`)
           break
         case 'v':
           this.debugState.vignette = !this.debugState.vignette
           this.applyDebugState()
-          console.log(`[DEBUG] Vignette: ${this.debugState.vignette ? 'ON' : 'OFF'}`)
           break
         case 'd':
           this.debugState.showDebugOverlay = !this.debugState.showDebugOverlay
           if (this.debugOverlay) {
             this.debugOverlay.style.display = this.debugState.showDebugOverlay ? 'block' : 'none'
           }
-          console.log(`[DEBUG] Debug Overlay: ${this.debugState.showDebugOverlay ? 'ON' : 'OFF'}`)
           break
         case 'a':
           // Toggle all visual elements at once
@@ -585,7 +590,6 @@ class SunSimulator {
           this.debugState.filmGrain = newState
           this.debugState.vignette = newState
           this.applyDebugState()
-          console.log(`[DEBUG] Toggle All: ${newState ? 'ON' : 'OFF'}`)
           break
         case 'm': {
           // Toggle audio mute
@@ -702,7 +706,6 @@ class SunSimulator {
           (this.blackHole.eventHorizon.material as THREE.ShaderMaterial).uniforms.glowIntensity.value = 2.0
         }
 
-        console.log('[DEBUG] Bloom controls reset to defaults')
       })
     }
   }
@@ -944,7 +947,6 @@ class SunSimulator {
           if (distanceToTarget < 1.0) {
             this.blackHoleCameraTransitioned = true
             this.isCameraLocked = false // FREE CAMERA - user can explore
-            console.log('[BLACK HOLE] Camera transition complete - camera unlocked')
           }
         }
 
@@ -959,7 +961,6 @@ class SunSimulator {
   }
 
   private startRedGiantExpansion(): void {
-    console.log('Starting red giant expansion...')
 
     if (this.star) {
       this.star.startRedGiantExpansion()
@@ -981,7 +982,6 @@ class SunSimulator {
   }
 
   private startSupernova(): void {
-    console.log('Starting supernova explosion...')
 
     // Play explosion sound effect immediately
     this.audioManager.playSoundEffect('explosion-flash', 1.0)
@@ -1004,7 +1004,6 @@ class SunSimulator {
     this.blackHole.setEventHorizonOpacity(0)
     this.blackHole.setAccretionDiskOpacity(0)
     this.blackHole.setJetOpacity(0)
-    console.log('[BLACK HOLE] Formation begins at singularity')
 
     // Hide planets during supernova
     if (this.planetSystem) {
@@ -1032,7 +1031,6 @@ class SunSimulator {
   }
 
   private completeBlackHoleTransition(): void {
-    console.log('[BLACK HOLE] Transition complete - entering black hole phase')
 
     // Black hole already exists and is fully formed (created at t=0, grown during t=0-2s)
     // Now set up accretion and transition to BLACK_HOLE phase
@@ -1050,11 +1048,9 @@ class SunSimulator {
 
     // Enable gravitational lensing pass - warp spacetime!
     this.lensingPass.setEnabled(true)
-    console.log('🌀 Gravitational lensing ENABLED - spacetime warping active')
 
     // Hide point light - no light escapes the singularity!
     this.pointLight.visible = false
-    console.log('💡 Point light hidden - singularity is dark')
 
     // Remove star (core has collapsed)
     if (this.star) {
@@ -1139,7 +1135,6 @@ class SunSimulator {
   }
 
   private startTransitionToMainSequence(): void {
-    console.log('Starting transition to main sequence star...')
 
     // Get protostar's current size for smooth transition
     const protostarRadius = this.nebula ? this.nebula.getProtostarRadius() : 4.8
@@ -1197,9 +1192,7 @@ class SunSimulator {
             this.scene.remove(this.nebula['particles'])
             this.scene.remove(this.nebula['protostar'])
             this.scene.remove(this.nebula['protostarLight'])
-            console.log('removing protostar!')
             this.nebula.dispose()
-            console.log('nebula disposed')
             this.nebula = null
           }
           clearInterval(fadeInterval)

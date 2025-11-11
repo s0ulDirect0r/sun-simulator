@@ -66,7 +66,6 @@ export class BlackHole {
 
     this.scene.add(this.eventHorizon)
 
-    console.log(`Event horizon created: radius=${this.blackHoleRadius}`)
   }
 
   private createPhotonCorona(): void {
@@ -82,7 +81,6 @@ export class BlackHole {
 
     this.scene.add(this.photonCorona)
 
-    console.log(`Photon corona shell created: radius=${coronaRadius}`)
   }
 
   private createLensingRing(): void {
@@ -112,8 +110,6 @@ export class BlackHole {
 
     this.scene.add(this.lensingRing)
 
-    console.log(`⭕ Photon ring (Einstein ring) created: inner=${innerRadius}, outer=${outerRadius}`)
-    console.log(`   Photon sphere at 1.5× Rs = ${this.blackHoleRadius * 1.5} units`)
   }
 
   private createAccretionDisk(): void {
@@ -122,7 +118,6 @@ export class BlackHole {
     const innerRadius = this.blackHoleRadius * 2.0  // 6.0 units
     const outerRadius = this.blackHoleRadius * 12.0  // 36.0 units
 
-    console.log(`Creating accretion disk: inner=${innerRadius}, outer=${outerRadius}, schwarzschild=${this.blackHoleRadius}`)
 
     // Create ring geometry for the disk
     const geometry = new THREE.RingGeometry(innerRadius, outerRadius, 128, 32)
@@ -136,7 +131,6 @@ export class BlackHole {
     this.accretionDisk = new THREE.Mesh(geometry, this.accretionDiskMaterial)
     this.accretionDisk.position.set(0, 0, 0)
 
-    console.log('Accretion disk created with shader material')
     this.scene.add(this.accretionDisk)
   }
 
@@ -174,7 +168,6 @@ export class BlackHole {
     this.jetBottom.renderOrder = 4
     this.scene.add(this.jetBottom)
 
-    console.log(`Jets created: length=${this.jetLength}, base radius=${baseRadius}`)
   }
 
   public update(deltaTime: number): void {
@@ -270,7 +263,6 @@ export class BlackHole {
 
     // Only log every 0.1 mass increase to reduce console spam
     if (this.currentMass - this.lastLoggedMass >= 0.1) {
-      console.log(`Black hole mass: ${this.currentMass.toFixed(2)}, radius: ${clampedRadius.toFixed(2)}`)
       this.lastLoggedMass = this.currentMass
     }
   }

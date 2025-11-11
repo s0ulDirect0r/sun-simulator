@@ -17,7 +17,7 @@
             Watch as cosmic dust collapses into a protostar, ignites fusion,
             expands into a red giant, and explodes in a supernova to form a black hole.
           </p>
-          <button id="btn-start" class="start-btn">Begin Simulation</button>
+          <button id="btn-start" class="start-btn" disabled style="opacity: 0.5; cursor: wait;">Loading audio...</button>
         </div>
       </div>
 
@@ -65,6 +65,12 @@
           <strong>Controls:</strong> Mouse drag to rotate • Scroll to zoom<br>
           <strong>Keys:</strong> Space = pause • R = reset • F = fullscreen • M = mute
         </div>
+      </div>
+
+      <!-- Audio Loading Indicator -->
+      <div id="audio-loading-indicator" style="display: none;">
+        <div class="audio-loading-icon">🔊</div>
+        <div class="audio-loading-text">Loading audio...</div>
       </div>
 
       <!-- Debug Overlay -->

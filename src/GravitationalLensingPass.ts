@@ -108,7 +108,6 @@ export class GravitationalLensingPass extends Pass {
 
     this.fsQuad = new FullScreenQuad(this.material)
 
-    console.log('🌀 Gravitational lensing pass created')
   }
 
   /**
@@ -129,7 +128,6 @@ export class GravitationalLensingPass extends Pass {
     this.material.uniforms.blackHoleScreenPos.value.copy(screenUV)
 
     // DEBUG: Log position and screen coords
-    console.log('🌀 Lensing - BH Position:', position, 'Screen UV:', screenUV, 'Strength:', this.material.uniforms.lensingStrength.value, 'Enabled:', this.material.uniforms.enabled.value)
   }
 
   /**
@@ -159,7 +157,6 @@ export class GravitationalLensingPass extends Pass {
    */
   public setEnabled(enabled: boolean): void {
     this.material.uniforms.enabled.value = enabled ? 1.0 : 0.0
-    console.log('🌀 Lensing pass:', enabled ? 'ENABLED' : 'DISABLED')
   }
 
   /**
