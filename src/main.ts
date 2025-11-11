@@ -963,8 +963,8 @@ class SunSimulator {
       this.star.startRedGiantExpansion()
     }
 
-    // Transition audio to red giant phase
-    this.audioManager.transitionToPhase(SimulationPhase.RED_GIANT, 4.0)
+    // Transition audio to red giant phase (slow, smooth crossfade)
+    this.audioManager.transitionToPhase(SimulationPhase.RED_GIANT, 7.0)
 
     // Update phase
     this.currentPhase = SimulationPhase.RED_GIANT
@@ -980,6 +980,9 @@ class SunSimulator {
 
   private startSupernova(): void {
     console.log('Starting supernova explosion...')
+
+    // Play explosion sound effect immediately
+    this.audioManager.playSoundEffect('explosion-flash', 1.0)
 
     if (this.star) {
       this.star.startSupernova()
@@ -1034,6 +1037,9 @@ class SunSimulator {
 
     // Transition audio to black hole phase (eerie!)
     this.audioManager.transitionToPhase(SimulationPhase.BLACK_HOLE, 3.0)
+
+    // Play gravitational rumble sound effect
+    this.audioManager.playSoundEffect('gravitational-rumble', 0.9)
 
     // Apply debug glow intensity if set
     if (this.blackHole) {

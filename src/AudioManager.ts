@@ -77,11 +77,8 @@ export class AudioManager {
       volume: 0.7
     })
 
-    this.phaseAudioConfig.set(SimulationPhase.SUPERNOVA, {
-      url: '/audio/supernova.mp3',
-      loop: false, // One-shot explosion
-      volume: 1.0
-    })
+    // Supernova uses only the explosion-flash sound effect, no ambient track
+    // (The phase is brief and the sound effect is dramatic enough)
 
     this.phaseAudioConfig.set(SimulationPhase.BLACK_HOLE, {
       url: '/audio/black-hole.mp3',
@@ -304,7 +301,7 @@ export class AudioManager {
 
       currentGain.gain.cancelScheduledValues(now)
       currentGain.gain.setValueAtTime(currentGain.gain.value, now)
-      currentGain.gain.exponentialRampToValueAtTime(0.001, now + duration)
+      currentGain.gain.linearRampToValueAtTime(0, now + duration)
 
       // Stop current source after fade completes
       setTimeout(() => {
@@ -315,8 +312,8 @@ export class AudioManager {
     // Fade in next phase
     const targetVolume = nextConfig.volume * (this.isMuted ? 0 : 1)
     nextGainNode.gain.cancelScheduledValues(now)
-    nextGainNode.gain.setValueAtTime(0.001, now)
-    nextGainNode.gain.exponentialRampToValueAtTime(Math.max(0.001, targetVolume), now + duration)
+    nextGainNode.gain.setValueAtTime(0, now)
+    nextGainNode.gain.linearRampToValueAtTime(targetVolume, now + duration)
 
     // Update references
     this.currentPhaseSource = nextSource
