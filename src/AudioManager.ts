@@ -312,6 +312,12 @@ export class AudioManager {
 
     // Decode the audio data
     const audioBuffer = await this.context.decodeAudioData(arrayBuffer)
+
+    // Free memory: delete preloaded data after successful decode
+    if (this.preloadedAudioData.has(key)) {
+      this.preloadedAudioData.delete(key)
+    }
+
     return audioBuffer
   }
 
