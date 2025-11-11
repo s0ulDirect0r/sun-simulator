@@ -142,8 +142,8 @@ export class AudioManager {
       this.isInitialized = true
       console.log('[AUDIO] AudioManager initialized successfully')
 
-      // Start loading audio files in the background
-      this.preloadAudio()
+      // Load audio files before resolving (prevents race condition)
+      await this.preloadAudio()
     } catch (error) {
       console.error('[AUDIO] Failed to initialize AudioContext:', error)
     }

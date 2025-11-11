@@ -585,7 +585,7 @@ class SunSimulator {
           this.applyDebugState()
           console.log(`[DEBUG] Toggle All: ${newState ? 'ON' : 'OFF'}`)
           break
-        case 'm':
+        case 'm': {
           // Toggle audio mute
           this.audioManager.toggleMute()
           const muteBtn = document.getElementById('btn-mute')
@@ -594,6 +594,7 @@ class SunSimulator {
             muteBtn.textContent = isMuted ? '🔇 Sound Off' : '🔊 Sound On'
           }
           break
+        }
       }
     })
 

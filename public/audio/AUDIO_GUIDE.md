@@ -61,23 +61,23 @@ Place these files in `/public/audio/sfx/`:
 
 ### Free & Open Sources
 
-1. **Freesound.org** (https://freesound.org)
+1. **Freesound.org** (<https://freesound.org>)
    - License: CC0 (public domain) or CC-BY (attribution required)
    - Largest community sound library
    - Search tips: Use specific keywords from above
    - Download as MP3 or convert from WAV
 
-2. **NASA Audio Library** (https://www.nasa.gov/audio-and-ringtones/)
+2. **NASA Audio Library** (<https://www.nasa.gov/audio-and-ringtones/>)
    - License: Public domain (NASA content)
    - Real space sounds (converted from radio waves)
    - Excellent for authentic nebula, pulsar, and cosmic sounds
 
-3. **BBC Sound Effects** (https://sound-effects.bbcrewind.co.uk/)
+3. **BBC Sound Effects** (<https://sound-effects.bbcrewind.co.uk/>)
    - License: RemArc (free for personal/educational use)
    - Professional quality recordings
    - Search "space", "rumble", "explosion", etc.
 
-4. **Archive.org Audio Collection** (https://archive.org/details/audio)
+4. **Archive.org Audio Collection** (<https://archive.org/details/audio>)
    - License: Various (check individual items)
    - Massive public domain collection
    - Search "space sounds", "ambient", "explosion"
@@ -86,7 +86,7 @@ Place these files in `/public/audio/sfx/`:
 
 If you can't find suitable sounds, you can generate them:
 
-1. **tone.js** (https://tonejs.github.io/)
+1. **tone.js** (<https://tonejs.github.io/>)
    - Generate drones, oscillations, noise
    - Perfect for nebula ambience and star hums
 
