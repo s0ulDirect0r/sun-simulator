@@ -79,7 +79,7 @@ bd close bd-42 --reason "Completed" --json
 3. **Work on it**: Implement, test, document
 4. **Discover new work?** Use `mcp__plugin_beads_beads__create` with `deps` parameter (or `bd create "Found bug" -p 1 --deps discovered-from:<parent-id>`)
 5. **Complete**: Use `mcp__plugin_beads_beads__close` (or `bd close <id> --reason "Done"`)
-6. **Commit together**: Always commit the `.beads/issues.jsonl` file together with the code changes so issue state stays in sync with code state
+6. **Commit together**: Commit `.beads/issues.jsonl` WITH code changes only. Never make "bead-only" commits (closing/updating beads without actual code work). Beads auto-sync to git - they'll be included when you commit real work.
 
 ### Auto-Sync
 

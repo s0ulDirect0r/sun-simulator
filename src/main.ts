@@ -992,6 +992,9 @@ class SunSimulator {
     // Transition audio to supernova (dramatic!)
     this.audioManager.transitionToPhase(SimulationPhase.SUPERNOVA, 1.5)
 
+    // Play explosion sound effect
+    this.audioManager.playSoundEffect('explosion-flash', 1.0)
+
     // Create black hole immediately (physically accurate: forms during core collapse)
     this.blackHole = new BlackHole(this.scene)
     this.blackHole.setScale(0) // Start at singularity point
@@ -1034,6 +1037,9 @@ class SunSimulator {
 
     // Transition audio to black hole phase (eerie!)
     this.audioManager.transitionToPhase(SimulationPhase.BLACK_HOLE, 3.0)
+
+    // Play gravitational rumble sound effect
+    this.audioManager.playSoundEffect('gravitational-rumble', 0.9)
 
     // Apply debug glow intensity if set
     if (this.blackHole) {
@@ -1108,6 +1114,9 @@ class SunSimulator {
 
       this.accretionSources.push(source)
     })
+
+    // Play accretion sound effect when streams begin
+    this.audioManager.playSoundEffect('accretion-chunk', 0.7)
 
     // Remove planets
     if (this.planetSystem) {
