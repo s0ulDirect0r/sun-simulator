@@ -55,9 +55,66 @@ export class AudioManager {
   private backgroundMusicSource: AudioBufferSourceNode | null = null
   private backgroundMusicVolume: number = 0.25 // Low volume to sit under ambients
 
+  // Preloaded raw audio data (fetched before AudioContext creation)
+  private preloadedAudioData: Map<string, ArrayBuffer> = new Map()
+  private isPreloaded: boolean = false
+
+  // Essential audio loading state
+  private essentialAudioReady: boolean = false
+  private audioLoadingCallbacks: Set<() => void> = new Set()
+  private pendingPhaseRequests: Map<SimulationPhase, boolean> = new Map()
+
   constructor() {
     this.setupPhaseAudioConfig()
     this.setupSoundEffectsConfig()
+  }
+
+  /**
+   * Preload audio files as raw ArrayBuffers (can be called before user interaction)
+   * This fetches all audio files in the background without creating an AudioContext
+   */
+  async preloadAudioFiles(): Promise<void> {
+    if (this.isPreloaded) {
+      return
+    }
+
+
+    const filesToPreload: Map<string, string> = new Map()
+
+    // Phase audio
+    for (const [phase, config] of this.phaseAudioConfig) {
+      filesToPreload.set(`phase_${phase}`, config.url)
+    }
+
+    // Sound effects
+    filesToPreload.set('sfx_ignition-burst', '/audio/sfx/ignition-burst.mp3')
+    filesToPreload.set('sfx_accretion-chunk', '/audio/sfx/accretion-chunk.mp3')
+    filesToPreload.set('sfx_explosion-flash', '/audio/sfx/explosion-flash.mp3')
+    filesToPreload.set('sfx_gravitational-rumble', '/audio/sfx/gravitational-rumble.mp3')
+
+    // Background music
+    filesToPreload.set('background-music', '/audio/background-music.mp3')
+
+    // Fetch all files in parallel
+    const fetchPromises = Array.from(filesToPreload.entries()).map(async ([key, url]) => {
+      try {
+        const response = await fetch(url)
+        const arrayBuffer = await response.arrayBuffer()
+        this.preloadedAudioData.set(key, arrayBuffer)
+      } catch (error) {
+        console.warn(`[AUDIO] Failed to preload ${key}:`, error)
+      }
+    })
+
+    await Promise.all(fetchPromises)
+    this.isPreloaded = true
+  }
+
+  /**
+   * Check if audio files have been preloaded
+   */
+  isPreloadComplete(): boolean {
+    return this.isPreloaded
   }
 
   /**
@@ -127,7 +184,6 @@ export class AudioManager {
    */
   async initialize(): Promise<void> {
     if (this.isInitialized) {
-      console.log('[AUDIO] Already initialized')
       return
     }
 
@@ -141,84 +197,133 @@ export class AudioManager {
       this.masterGain.gain.value = this.masterVolume
 
       this.isInitialized = true
-      console.log('[AUDIO] AudioManager initialized successfully')
 
-      // Load audio files before resolving (prevents race condition)
-      await this.preloadAudio()
+      // Decode essential audio (nebula + background music) - wait for this!
+      await this.decodeEssentialAudio()
+
+      // Decode remaining audio in background (doesn't block)
+      this.decodeRemainingAudio()
     } catch (error) {
       console.error('[AUDIO] Failed to initialize AudioContext:', error)
     }
   }
 
   /**
-   * Preload all audio files to avoid delays during playback
+   * Decode only essential audio for immediate playback (nebula + background music)
    */
-  private async preloadAudio(): Promise<void> {
+  private async decodeEssentialAudio(): Promise<void> {
     if (!this.context) return
 
-    console.log('[AUDIO] Starting audio preload...')
 
-    // Load phase audio
-    for (const [phase, config] of this.phaseAudioConfig) {
+    // Decode nebula phase audio (first phase)
+    try {
+      const nebulaConfig = this.phaseAudioConfig.get(SimulationPhase.NEBULA_COLLAPSE)
+      if (nebulaConfig) {
+        const buffer = await this.decodeAudioFile('phase_NEBULA_COLLAPSE', nebulaConfig.url)
+        this.phaseAudioBuffers.set(SimulationPhase.NEBULA_COLLAPSE, buffer)
+      }
+    } catch (error) {
+      console.warn('[AUDIO] Failed to decode nebula audio:', error)
+    }
+
+    // Decode background music
+    try {
+      const buffer = await this.decodeAudioFile('background-music', '/audio/background-music.mp3')
+      this.backgroundMusicBuffer = buffer
+    } catch (error) {
+      console.warn('[AUDIO] Failed to decode background music:', error)
+    }
+
+
+    // Mark as ready and notify callbacks
+    this.essentialAudioReady = true
+    this.notifyAudioReady()
+
+    // Process any pending phase playback requests
+    this.processPendingPhaseRequests()
+  }
+
+  /**
+   * Decode remaining audio in background (doesn't block simulation start)
+   */
+  private async decodeRemainingAudio(): Promise<void> {
+    if (!this.context) return
+
+
+    // Decode remaining phase audio
+    const remainingPhases = [
+      SimulationPhase.MAIN_SEQUENCE,
+      SimulationPhase.RED_GIANT,
+      SimulationPhase.BLACK_HOLE
+    ]
+
+    for (const phase of remainingPhases) {
       try {
-        const buffer = await this.loadAudioFile(config.url)
-        this.phaseAudioBuffers.set(phase, buffer)
-        console.log(`[AUDIO] Loaded phase audio: ${phase}`)
+        const config = this.phaseAudioConfig.get(phase)
+        if (config) {
+          const buffer = await this.decodeAudioFile(`phase_${phase}`, config.url)
+          this.phaseAudioBuffers.set(phase, buffer)
+        }
       } catch (error) {
-        console.warn(`[AUDIO] Failed to load ${phase} audio:`, error)
-        this.phaseAudioBuffers.set(phase, null)
+        console.warn(`[AUDIO] Failed to decode ${phase} audio:`, error)
       }
     }
 
-    // Load sound effects
-    const sfxUrls: Map<string, string> = new Map([
+    // Decode sound effects
+    const sfxMap: Map<string, string> = new Map([
       ['ignition-burst', '/audio/sfx/ignition-burst.mp3'],
       ['accretion-chunk', '/audio/sfx/accretion-chunk.mp3'],
       ['explosion-flash', '/audio/sfx/explosion-flash.mp3'],
       ['gravitational-rumble', '/audio/sfx/gravitational-rumble.mp3']
     ])
 
-    for (const [name, url] of sfxUrls) {
+    for (const [name, url] of sfxMap) {
       try {
-        const buffer = await this.loadAudioFile(url)
+        const buffer = await this.decodeAudioFile(`sfx_${name}`, url)
         const sfx = this.sfxBuffers.get(name)
         if (sfx) {
           sfx.buffer = buffer
-          console.log(`[AUDIO] Loaded sound effect: ${name}`)
         }
       } catch (error) {
-        console.warn(`[AUDIO] Failed to load ${name} SFX:`, error)
+        console.warn(`[AUDIO] Failed to decode ${name} SFX:`, error)
       }
     }
 
-    // Load background music
-    try {
-      const buffer = await this.loadAudioFile('/audio/background-music.mp3')
-      this.backgroundMusicBuffer = buffer
-      console.log('[AUDIO] Loaded background music')
-    } catch (error) {
-      console.warn('[AUDIO] Failed to load background music:', error)
-    }
-
-    console.log('[AUDIO] Audio preload complete')
   }
 
   /**
-   * Load an audio file and decode it into an AudioBuffer
+   * Decode an audio file into an AudioBuffer (uses preloaded data if available)
+   * @param key - Preload key for this audio file
+   * @param url - Fallback URL if not preloaded
    */
-  private async loadAudioFile(url: string): Promise<AudioBuffer> {
+  private async decodeAudioFile(key: string, url: string): Promise<AudioBuffer> {
     if (!this.context) {
       throw new Error('AudioContext not initialized')
     }
 
-    const response = await fetch(url)
-    const arrayBuffer = await response.arrayBuffer()
+    // Check if we have preloaded data
+    let arrayBuffer = this.preloadedAudioData.get(key)
+
+    if (!arrayBuffer) {
+      // Fallback: fetch now if not preloaded
+      const response = await fetch(url)
+      arrayBuffer = await response.arrayBuffer()
+    }
+
+    // Decode the audio data
     const audioBuffer = await this.context.decodeAudioData(arrayBuffer)
+
+    // Free memory: delete preloaded data after successful decode
+    if (this.preloadedAudioData.has(key)) {
+      this.preloadedAudioData.delete(key)
+    }
+
     return audioBuffer
   }
 
   /**
    * Start playing audio for a specific phase
+   * If audio isn't ready yet, queues the request to play when available
    */
   playPhase(phase: SimulationPhase): void {
     if (!this.isInitialized || !this.context || !this.masterGain) {
@@ -230,6 +335,12 @@ export class AudioManager {
     const config = this.phaseAudioConfig.get(phase)
 
     if (!buffer || !config) {
+      // Audio not loaded yet - queue for later if it's an essential phase
+      if (!this.essentialAudioReady && phase === SimulationPhase.NEBULA_COLLAPSE) {
+        this.pendingPhaseRequests.set(phase, true)
+        return
+      }
+
       console.warn(`[AUDIO] No audio loaded for phase: ${phase}`)
       return
     }
@@ -260,7 +371,6 @@ export class AudioManager {
     this.currentPhaseSource = source
     this.currentPhaseGain = gainNode
 
-    console.log(`[AUDIO] Playing phase: ${phase}`)
   }
 
   /**
@@ -338,7 +448,6 @@ export class AudioManager {
       this.isCrossfading = false
     }, duration * 1000)
 
-    console.log(`[AUDIO] Crossfading to ${nextPhase} over ${duration}s`)
   }
 
   /**
@@ -380,7 +489,6 @@ export class AudioManager {
     // Store reference
     this.backgroundMusicSource = source
 
-    console.log('[AUDIO] Background music started')
   }
 
   /**
@@ -390,7 +498,6 @@ export class AudioManager {
     if (this.backgroundMusicSource) {
       this.backgroundMusicSource.stop()
       this.backgroundMusicSource = null
-      console.log('[AUDIO] Background music stopped')
     }
   }
 
@@ -448,7 +555,6 @@ export class AudioManager {
       }
     }
 
-    console.log(`[AUDIO] Playing SFX: ${name}`)
   }
 
   /**
@@ -514,7 +620,6 @@ export class AudioManager {
       }
     }
 
-    console.log(`[AUDIO] Playing spatial SFX: ${name} at (${x}, ${y}, ${z})`)
   }
 
   /**
@@ -527,7 +632,6 @@ export class AudioManager {
       this.masterGain.gain.value = this.masterVolume * (this.isMuted ? 0 : 1)
     }
 
-    console.log(`[AUDIO] Master volume: ${(this.masterVolume * 100).toFixed(0)}%`)
   }
 
   /**
@@ -543,7 +647,6 @@ export class AudioManager {
   toggleMute(): void {
     this.isMuted = !this.isMuted
     this.updateMuteState()
-    console.log(`[AUDIO] ${this.isMuted ? 'Muted' : 'Unmuted'}`)
   }
 
   /**
@@ -577,6 +680,31 @@ export class AudioManager {
   }
 
   /**
+   * Notify all callbacks that essential audio is ready
+   */
+  private notifyAudioReady(): void {
+    this.audioLoadingCallbacks.forEach(callback => {
+      try {
+        callback()
+      } catch (error) {
+        console.error('[AUDIO] Error in audio ready callback:', error)
+      }
+    })
+    // Clear callbacks after notifying
+    this.audioLoadingCallbacks.clear()
+  }
+
+  /**
+   * Process any pending phase playback requests
+   */
+  private processPendingPhaseRequests(): void {
+    this.pendingPhaseRequests.forEach((_, phase) => {
+      this.playPhase(phase)
+    })
+    this.pendingPhaseRequests.clear()
+  }
+
+  /**
    * Stop all audio playback
    */
   stopAll(): void {
@@ -599,7 +727,6 @@ export class AudioManager {
     })
     this.activeSfxSources = []
 
-    console.log('[AUDIO] All audio stopped')
   }
 
   /**
@@ -614,7 +741,6 @@ export class AudioManager {
     }
 
     this.isInitialized = false
-    console.log('[AUDIO] AudioManager disposed')
   }
 
   /**
@@ -622,6 +748,27 @@ export class AudioManager {
    */
   isReady(): boolean {
     return this.isInitialized && this.context !== null
+  }
+
+  /**
+   * Check if essential audio (nebula + background music) is decoded and ready
+   */
+  isEssentialAudioReady(): boolean {
+    return this.essentialAudioReady
+  }
+
+  /**
+   * Register a callback to be notified when essential audio is ready
+   * If audio is already ready, callback is invoked immediately
+   */
+  onEssentialAudioReady(callback: () => void): void {
+    if (this.essentialAudioReady) {
+      // Audio already ready, invoke immediately
+      callback()
+    } else {
+      // Queue for later
+      this.audioLoadingCallbacks.add(callback)
+    }
   }
 
   /**

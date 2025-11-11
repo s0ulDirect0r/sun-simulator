@@ -229,7 +229,6 @@ export class SupernovaRemnant {
     this.blackHolePosition.copy(blackHolePosition)
     this.accretionStrength = strength
     this.eventHorizonRadius = horizonRadius
-    console.log(`Accretion enabled: strength=${strength}, horizon radius=${horizonRadius}`)
   }
 
   public setConsumptionCallback(callback: (mass: number) => void): void {
