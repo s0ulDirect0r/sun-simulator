@@ -15,15 +15,7 @@ import { FilmGrainPass } from './FilmGrainPass'
 import { VignettePass } from './VignettePass'
 import { GravitationalLensingPass } from './GravitationalLensingPass'
 import { Starfield } from './Starfield'
-import { AudioManager } from './AudioManager'
-
-enum SimulationPhase {
-  NEBULA_COLLAPSE = 'NEBULA_COLLAPSE',
-  MAIN_SEQUENCE = 'MAIN_SEQUENCE',
-  RED_GIANT = 'RED_GIANT',
-  SUPERNOVA = 'SUPERNOVA',
-  BLACK_HOLE = 'BLACK_HOLE'
-}
+import { AudioManager, SimulationPhase } from './AudioManager'
 
 class SunSimulator {
   private scene: THREE.Scene
