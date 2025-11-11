@@ -7,7 +7,7 @@
 [User starts conversation]
 Claude: [Uses Read tool on AGENTS.md]
 Claude: I've read the workflow guidelines. Ready to work!
-Claude: [Runs bd ready --json to check for work]
+Claude: [Uses mcp__plugin_beads_beads__ready to check for work]
 ```
 
 **INCORRECT (do NOT do this):**
@@ -30,7 +30,9 @@ Claude: Hello! What would you like to work on?
 
 ### Quick Start
 
-Use `bd` CLI commands via the Bash tool. Always include `--json` flag for programmatic use.
+**PREFERRED**: Use the beads MCP plugin tools (e.g., `mcp__plugin_beads_beads__ready`, `mcp__plugin_beads_beads__create`, etc.). These provide direct programmatic access to beads functionality.
+
+**FALLBACK**: Use `bd` CLI commands via the Bash tool if MCP tools are unavailable. Always include `--json` flag for programmatic use.
 
 **Check for ready work:**
 ```bash
@@ -72,12 +74,11 @@ bd close bd-42 --reason "Completed" --json
 
 ### Workflow for AI Agents
 
-1. **Check ready work**: `bd ready` shows unblocked issues
-2. **Claim your task**: `bd update <id> --status in_progress`
+1. **Check ready work**: Use `mcp__plugin_beads_beads__ready` (or `bd ready` CLI)
+2. **Claim your task**: Use `mcp__plugin_beads_beads__update` with `status=in_progress` (or `bd update <id> --status in_progress`)
 3. **Work on it**: Implement, test, document
-4. **Discover new work?** Create linked issue:
-   - `bd create "Found bug" -p 1 --deps discovered-from:<parent-id>`
-5. **Complete**: `bd close <id> --reason "Done"`
+4. **Discover new work?** Use `mcp__plugin_beads_beads__create` with `deps` parameter (or `bd create "Found bug" -p 1 --deps discovered-from:<parent-id>`)
+5. **Complete**: Use `mcp__plugin_beads_beads__close` (or `bd close <id> --reason "Done"`)
 6. **Commit together**: Always commit the `.beads/issues.jsonl` file together with the code changes so issue state stays in sync with code state
 
 ### Auto-Sync
@@ -117,10 +118,10 @@ history/
 
 ### Important Rules
 
-- ✅ Use bd for ALL task tracking
-- ✅ Always use `--json` flag for programmatic use
+- ✅ Use bd for ALL task tracking (prefer MCP plugin tools when available)
+- ✅ When using CLI: Always use `--json` flag for programmatic use
 - ✅ Link discovered work with `discovered-from` dependencies
-- ✅ Check `bd ready` before asking "what should I work on?"
+- ✅ Check ready work (MCP `ready` or CLI `bd ready`) before asking "what should I work on?"
 - ✅ Store AI planning docs in `history/` directory
 - ❌ Do NOT create markdown TODO lists
 - ❌ Do NOT use external issue trackers

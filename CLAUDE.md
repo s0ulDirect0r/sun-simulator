@@ -18,7 +18,7 @@ REQUIRED: Read AGENTS.md first, then proceed
 
 <project_overview>
 ## Quick Reference
-- **Issue Tracking**: bd (beads) via CLI - see AGENTS.md for full workflow
+- **Issue Tracking**: bd (beads) via MCP plugin (preferred) or CLI - see AGENTS.md for full workflow
 - **Tech Stack**: Three.js, WebGL, TypeScript, Vite
 - **Project Type**: Portfolio piece - visual showcase of 3D graphics mastery
 - **Goal**: "Spectacular Science" - impressive 3D stellar evolution simulator
@@ -33,7 +33,8 @@ REQUIRED: Read AGENTS.md first, then proceed
 - Project issues/features that persist across sessions
 - Work shared with team (tracked in git via `.beads/issues.jsonl`)
 - Anything that should survive conversation end
-- Check `bd ready --json` to find unblocked work
+- Access via MCP plugin tools (preferred): `mcp__plugin_beads_beads__ready`, `mcp__plugin_beads_beads__list`, etc.
+- Fallback to CLI: `bd ready --json` if MCP unavailable
 
 **Use TodoWrite for:**
 - In-conversation task tracking during complex implementations
