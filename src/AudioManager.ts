@@ -53,7 +53,6 @@ export class AudioManager {
   // Background music (continuous underscore)
   private backgroundMusicBuffer: AudioBuffer | null = null
   private backgroundMusicSource: AudioBufferSourceNode | null = null
-  private backgroundMusicGain: GainNode | null = null
   private backgroundMusicVolume: number = 0.25 // Low volume to sit under ambients
 
   constructor() {
@@ -378,9 +377,8 @@ export class AudioManager {
     // Start playback
     source.start(0)
 
-    // Store references
+    // Store reference
     this.backgroundMusicSource = source
-    this.backgroundMusicGain = gainNode
 
     console.log('[AUDIO] Background music started')
   }
@@ -392,7 +390,6 @@ export class AudioManager {
     if (this.backgroundMusicSource) {
       this.backgroundMusicSource.stop()
       this.backgroundMusicSource = null
-      this.backgroundMusicGain = null
       console.log('[AUDIO] Background music stopped')
     }
   }
