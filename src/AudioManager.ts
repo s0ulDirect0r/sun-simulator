@@ -50,6 +50,11 @@ export class AudioManager {
   private isCrossfading: boolean = false
   private crossfadeDuration: number = 3.0 // seconds
 
+  // Background music (continuous underscore)
+  private backgroundMusicBuffer: AudioBuffer | null = null
+  private backgroundMusicSource: AudioBufferSourceNode | null = null
+  private backgroundMusicVolume: number = 0.25 // Low volume to sit under ambients
+
   constructor() {
     this.setupPhaseAudioConfig()
     this.setupSoundEffectsConfig()
@@ -184,6 +189,15 @@ export class AudioManager {
       } catch (error) {
         console.warn(`[AUDIO] Failed to load ${name} SFX:`, error)
       }
+    }
+
+    // Load background music
+    try {
+      const buffer = await this.loadAudioFile('/audio/background-music.mp3')
+      this.backgroundMusicBuffer = buffer
+      console.log('[AUDIO] Loaded background music')
+    } catch (error) {
+      console.warn('[AUDIO] Failed to load background music:', error)
     }
 
     console.log('[AUDIO] Audio preload complete')
@@ -325,6 +339,59 @@ export class AudioManager {
     }, duration * 1000)
 
     console.log(`[AUDIO] Crossfading to ${nextPhase} over ${duration}s`)
+  }
+
+  /**
+   * Start playing background music (continuous underscore beneath phase audio)
+   */
+  playBackgroundMusic(): void {
+    if (!this.isInitialized || !this.context || !this.masterGain) {
+      console.warn('[AUDIO] Cannot play background music - not initialized')
+      return
+    }
+
+    if (!this.backgroundMusicBuffer) {
+      console.warn('[AUDIO] Background music not loaded')
+      return
+    }
+
+    // Stop existing background music if playing
+    if (this.backgroundMusicSource) {
+      this.backgroundMusicSource.stop()
+      this.backgroundMusicSource = null
+    }
+
+    // Create source
+    const source = this.context.createBufferSource()
+    source.buffer = this.backgroundMusicBuffer
+    source.loop = true
+
+    // Create gain node for background music
+    const gainNode = this.context.createGain()
+    gainNode.gain.value = this.backgroundMusicVolume * (this.isMuted ? 0 : 1)
+
+    // Connect: source → gainNode → masterGain → destination
+    source.connect(gainNode)
+    gainNode.connect(this.masterGain)
+
+    // Start playback
+    source.start(0)
+
+    // Store reference
+    this.backgroundMusicSource = source
+
+    console.log('[AUDIO] Background music started')
+  }
+
+  /**
+   * Stop background music
+   */
+  stopBackgroundMusic(): void {
+    if (this.backgroundMusicSource) {
+      this.backgroundMusicSource.stop()
+      this.backgroundMusicSource = null
+      console.log('[AUDIO] Background music stopped')
+    }
   }
 
   /**
@@ -518,6 +585,9 @@ export class AudioManager {
       this.currentPhaseSource.stop()
       this.currentPhaseSource = null
     }
+
+    // Stop background music
+    this.stopBackgroundMusic()
 
     // Stop all active sound effects
     this.activeSfxSources.forEach(source => {
